@@ -155,15 +155,17 @@ export function GameTable({ game }: { game: GameView }) {
   const cutterToastHandRef = useRef(0);
   useEffect(() => {
     const prev = prevCiftciRef.current;
-    for (const p of game.seats) {
-      if (p.isCiftci && prev[p.seat] === false) {
-        setToast(`${p.name} çiftçi oldu.`);
-        window.clearTimeout((setToast as unknown as { _t?: number })._t);
-        (setToast as unknown as { _t?: number })._t = window.setTimeout(
-          () => setToast(null),
-          3500
-        );
-      }
+    const newcomers = game.seats.filter((p) => p.isCiftci && prev[p.seat] === false);
+    if (newcomers.length > 0) {
+      const names = newcomers.map((p) => p.name).join(', ');
+      setToast(
+        newcomers.length === 1 ? `${names} çiftçi oldu.` : `${names} çiftçi oldu.`
+      );
+      window.clearTimeout((setToast as unknown as { _t?: number })._t);
+      (setToast as unknown as { _t?: number })._t = window.setTimeout(
+        () => setToast(null),
+        2800
+      );
     }
     prevCiftciRef.current = game.seats.map((p) => p.isCiftci);
   }, [game.seats]);
@@ -509,12 +511,12 @@ export function GameTable({ game }: { game: GameView }) {
             İşlek — T1: {game.islekPenalty?.[0] ?? 0} / T2: {game.islekPenalty?.[1] ?? 0}
           </span>
         )}
-        {(seesAllDiscards || bothTeamsCiftci) && (
-          <span className="ciftci-visibility-tag">
+        {(seesAllDiscards || bothTeamsCiftci) && game.discardCount === 0 && (
+          <span className="ciftci-visibility-tag game-info-secondary">
             {bothTeamsCiftci
-              ? 'Her iki takımda çiftçi — tüm atıklar görünür'
+              ? 'Her iki takımda çiftçi'
               : meInfo.isCiftci
-                ? 'Çiftçi — tüm atıkları görüyorsun'
+                ? 'Çiftçi — tüm atıklar'
                 : 'Tüm atıklar görünür'}
           </span>
         )}
@@ -558,7 +560,7 @@ export function GameTable({ game }: { game: GameView }) {
             </button>
             <span className="pile-label">Atık ({game.discardCount})</span>
           </div>
-          <div className="pile">
+          <div className="pile pile-taban">
             <CardView card={game.taban} />
             <span className="pile-label">Taban</span>
           </div>
@@ -680,6 +682,47 @@ export function GameTable({ game }: { game: GameView }) {
         </div>
       )}
 
+      {!handEnded && myTurn && game.phase === 'draw' && (
+        <div className="draw-dock" aria-label="Desteden çek veya atık al">
+          <div className="pile">
+            <button
+              className={`pile-btn ${canDrawFromPile ? 'active' : ''} ${deckEmpty ? 'deck-empty' : ''}`}
+              onClick={() => canDrawFromPile && socket.emit('turn:drawPile')}
+              disabled={!canDrawFromPile}
+              title={deckEmpty ? 'Deste bitti' : 'Desteden çek'}
+            >
+              {deckEmpty ? (
+                <div className="card empty-slot deck-end-slot">El sonu</div>
+              ) : game.drawTopBack ? (
+                <CardBack back={game.drawTopBack} />
+              ) : (
+                <div className="card empty-slot" />
+              )}
+            </button>
+            <span className="pile-label">Deste</span>
+          </div>
+          <div className="pile">
+            <button
+              className={`pile-btn ${canDraw && discardTakeable ? 'active' : ''}`}
+              onClick={takeTopDiscard}
+              disabled={!canDraw || !discardTakeable}
+              title={meInfo.isCiftci ? 'Atığı al' : 'Atığı al / sor'}
+            >
+              {game.discardTop ? (
+                <CardView card={game.discardTop} />
+              ) : (
+                <div className="card empty-slot" />
+              )}
+            </button>
+            <span className="pile-label">Atık</span>
+          </div>
+          <div className="pile pile-taban">
+            <CardView card={game.taban} />
+            <span className="pile-label">Taban</span>
+          </div>
+        </div>
+      )}
+
       {!handEnded && (
       <div className="my-hand">
         <div className="my-hand-head">
@@ -716,7 +759,12 @@ export function GameTable({ game }: { game: GameView }) {
                 </span>
               ) : meInfo.isCiftci && discardTakeable ? (
                 <span className="turn-note">
-                  Çiftçisin — atığa tıklayarak doğrudan al (sormana gerek yok)
+                  <span className="turn-note-mobile">
+                    Çiftçisin — çekme çubuğundan al
+                  </span>
+                  <span className="turn-note-desktop">
+                    Çiftçisin — masadaki atığa tıklayarak al
+                  </span>
                 </span>
               ) : (
                 <span className="turn-note">Sıra sende — desteden çek ya da atığı al</span>
@@ -839,9 +887,9 @@ export function GameTable({ game }: { game: GameView }) {
         )}
 
         {seesAllDiscards && game.discardCount > 0 && (
-          <details className="discard-view" open>
+          <details className="discard-view">
             <summary>
-              Tüm atıklar ({game.discardCount}) — en üstteki masada, alttakiler geçmiş
+              Tüm atıklar ({game.discardCount})
             </summary>
             {game.visibleDiscards && game.visibleDiscards.length > 0 ? (
               <div className="discard-list">
