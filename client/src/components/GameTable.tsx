@@ -39,6 +39,17 @@ function validatePairClient(a: Card, b: Card, taban: Card): string | null {
   return null;
 }
 
+function seatOpenLabel(p: GameView['seats'][number]): { long: string; short: string } | null {
+  if (!p.hasOpened) return null;
+  if (p.openType === 'cift') {
+    return { long: `çift açtı (${p.pairCount})`, short: `Ç${p.pairCount}` };
+  }
+  if (p.openType === 'per') {
+    return { long: `per açtı (${p.openedValue})`, short: `P${p.openedValue}` };
+  }
+  return { long: 'açık', short: 'A' };
+}
+
 export function GameTable({ game }: { game: GameView }) {
   const me = game.yourSeat;
   const meInfo = game.seats[me];
@@ -564,23 +575,51 @@ export function GameTable({ game }: { game: GameView }) {
               className={`gseat gseat-${pos} team-${p.team} ${isTurn ? 'turn' : ''}`}
             >
               <div className="gseat-label">
-                {p.name}
-                {p.isBot && <span className="tag">bot</span>}
-                {!p.isBot && !p.connected && (
-                  <span className="tag disconnected">kopuk</span>
-                )}
-                {isMe && <span className="tag you">sen</span>}
-                {p.hasOpened && (
-                  <span className="tag opened">
-                    {p.openType === 'cift'
-                      ? `çift açtı (${p.pairCount})`
-                      : p.openType === 'per'
-                        ? `per açtı (${p.openedValue})`
-                        : 'açık'}
-                  </span>
-                )}
-                {p.isCiftci && <span className="tag ciftci">çiftçi</span>}
-                {isTurn && <span className="tag turn-tag">sıra</span>}
+                <span className="gseat-name" title={p.name}>
+                  {p.name}
+                </span>
+                <div className="gseat-tags">
+                  {p.isBot && (
+                    <span className="tag">
+                      <span className="tag-long">bot</span>
+                      <span className="tag-short">B</span>
+                    </span>
+                  )}
+                  {!p.isBot && !p.connected && (
+                    <span className="tag disconnected">
+                      <span className="tag-long">kopuk</span>
+                      <span className="tag-short">!</span>
+                    </span>
+                  )}
+                  {isMe && (
+                    <span className="tag you">
+                      <span className="tag-long">sen</span>
+                      <span className="tag-short">S</span>
+                    </span>
+                  )}
+                  {(() => {
+                    const open = seatOpenLabel(p);
+                    if (!open) return null;
+                    return (
+                      <span className="tag opened" title={open.long}>
+                        <span className="tag-long">{open.long}</span>
+                        <span className="tag-short">{open.short}</span>
+                      </span>
+                    );
+                  })()}
+                  {p.isCiftci && (
+                    <span className="tag ciftci">
+                      <span className="tag-long">çiftçi</span>
+                      <span className="tag-short">Çf</span>
+                    </span>
+                  )}
+                  {isTurn && (
+                    <span className="tag turn-tag">
+                      <span className="tag-long">sıra</span>
+                      <span className="tag-short">●</span>
+                    </span>
+                  )}
+                </div>
               </div>
               {!isMe && !handEnded && (
                 <>

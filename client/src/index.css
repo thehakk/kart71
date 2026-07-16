@@ -409,12 +409,31 @@ button.link {
 .gseat-label {
   font-size: 13px;
   font-weight: 600;
-  background: rgba(15, 23, 42, 0.8);
-  padding: 3px 8px;
-  border-radius: 6px;
-  display: inline-flex;
-  gap: 5px;
+  background: rgba(15, 23, 42, 0.88);
+  padding: 4px 8px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  gap: 3px;
+  max-width: 168px;
+}
+.gseat-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.gseat-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: center;
+  align-items: center;
+}
+.tag-short {
+  display: none;
 }
 .gseat.turn .gseat-label {
   box-shadow: 0 0 0 2px var(--accent);
@@ -724,7 +743,38 @@ button.primary {
   }
   .gseat-label {
     font-size: 11px;
-    padding: 2px 6px;
+    padding: 3px 6px;
+    max-width: 96px;
+    gap: 2px;
+  }
+  .gseat-name {
+    max-width: 88px;
+    font-size: 11px;
+  }
+  .gseat-tags {
+    gap: 2px;
+  }
+  .gseat-tags .tag {
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 4px;
+  }
+  .tag-long {
+    display: none;
+  }
+  .tag-short {
+    display: inline;
+  }
+  .gseat-left .gseat-label,
+  .gseat-right .gseat-label {
+    max-width: 72px;
+  }
+  .gseat-left .gseat-name,
+  .gseat-right .gseat-name {
+    max-width: 68px;
+  }
+  .count-badge {
+    font-size: 10px;
   }
   .opp-hand .card-sm {
     margin-left: -12px;
