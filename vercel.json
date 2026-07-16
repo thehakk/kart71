@@ -4,5 +4,8 @@
   "buildCommand": "npm run build --workspace client",
   "outputDirectory": "client/dist",
   "framework": "vite",
+  "env": {
+    "VITE_SERVER_URL": "https://kart71-server.onrender.com"
+  },
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
