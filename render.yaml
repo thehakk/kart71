@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: kart71-server
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build --workspace server
+    startCommand: node server/dist/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLIENT_ORIGIN
+        sync: false
