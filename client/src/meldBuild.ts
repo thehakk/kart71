@@ -67,6 +67,18 @@ export interface BuiltMeld {
   points: number;
 }
 
+// Secilen kagitlardan per turunu otomatik algila (once sirali, sonra erkek).
+export function detectAndBuildMeld(
+  selected: Card[]
+): BuiltMeld | { error: string } {
+  if (selected.length < 3) return { error: 'Per en az 3 kağıt olmalı.' };
+  const run = buildMeld('run', selected);
+  if (!('error' in run)) return run;
+  const group = buildMeld('group', selected);
+  if (!('error' in group)) return group;
+  return { error: 'Seçilen kağıtlar geçerli bir per oluşturmuyor.' };
+}
+
 // Secilen kagitlardan bir per olustur (dogrulama + puan). Hata varsa {error}.
 export function buildMeld(
   type: MeldType,

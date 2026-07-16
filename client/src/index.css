@@ -475,13 +475,18 @@ button.link {
 
 .my-hand {
   margin-top: 14px;
-  background: var(--panel);
-  border-radius: 12px;
-  padding: 12px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.9));
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  padding: 12px 10px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
 }
 .my-hand-head {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
   font-size: 14px;
   color: var(--muted);
   margin-bottom: 8px;
@@ -498,11 +503,43 @@ button.link {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  justify-content: center;
+}
+.hand-cards-grid {
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .hand-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--hand-cols-mobile, 5), max-content);
+    grid-template-rows: repeat(3, auto);
+    grid-auto-flow: row;
+    gap: 6px 5px;
+    justify-content: center;
+    align-content: start;
+    padding: 2px 0 4px;
+  }
+  .hand-cards-grid .card {
+    width: clamp(34px, 9.5vw, 44px);
+    height: clamp(48px, 13.5vw, 62px);
+    font-size: clamp(11px, 3vw, 14px);
+  }
+}
+@media (min-width: 641px) {
+  .hand-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(var(--hand-cols-desktop, 7), max-content);
+    grid-template-rows: repeat(2, auto);
+    grid-auto-flow: row;
+    gap: 5px 4px;
+    justify-content: center;
+  }
 }
 .drag-hint {
   font-size: 12px;
   color: var(--muted);
-  margin: 6px 0 0;
+  margin: 8px 0 0;
+  text-align: center;
 }
 
 /* Deste/atik tiklama butonlari */
@@ -698,6 +735,13 @@ button.primary {
   }
   .hand-cards {
     gap: 3px;
+    justify-content: center;
+  }
+  .my-hand-head {
+    font-size: 13px;
+  }
+  .sort-controls {
+    width: 100%;
     justify-content: center;
   }
   .lobby-card {

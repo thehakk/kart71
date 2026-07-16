@@ -10,12 +10,15 @@ import {
 import {
   SortableContext,
   arrayMove,
-  horizontalListSortingStrategy,
+  rectSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import type { CSSProperties } from 'react';
 import type { Card } from '../types';
 import { CardView } from './CardView';
+
+const HAND_ROWS_MOBILE = 3;
 
 function SortableCard({
   card,
@@ -28,11 +31,12 @@ function SortableCard({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: card.id });
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.6 : 1,
+    opacity: isDragging ? 0.65 : 1,
     touchAction: 'none',
+    zIndex: isDragging ? 2 : undefined,
   };
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
@@ -55,13 +59,20 @@ export function HandCards({
   onCardClick?: (c: Card) => void;
 }) {
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 6 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 0, tolerance: 8 } })
   );
+
+  const gridColsMobile = Math.max(1, Math.ceil(cards.length / HAND_ROWS_MOBILE));
+  const gridColsDesktop = Math.max(1, Math.ceil(cards.length / 2));
+  const gridStyle = {
+    ['--hand-cols-mobile' as string]: String(gridColsMobile),
+    ['--hand-cols-desktop' as string]: String(gridColsDesktop),
+  } as CSSProperties;
 
   if (!draggable) {
     return (
-      <div className="hand-cards">
+      <div className="hand-cards hand-cards-grid" style={gridStyle}>
         {cards.map((c) => (
           <CardView
             key={c.id}
@@ -86,8 +97,8 @@ export function HandCards({
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
-        <div className="hand-cards">
+      <SortableContext items={ids} strategy={rectSortingStrategy}>
+        <div className="hand-cards hand-cards-grid" style={gridStyle}>
           {cards.map((c) => (
             <SortableCard
               key={c.id}

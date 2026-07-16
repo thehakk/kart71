@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Card, GameView, MeldType, Seat } from '../types';
+import type { Card, GameView, Seat } from '../types';
 import { socket } from '../socket';
 import { arrangeHand, type SortMode } from '../handSort';
-import { buildMeld, type BuiltMeld } from '../meldBuild';
+import { detectAndBuildMeld, type BuiltMeld } from '../meldBuild';
 import { CardBack, CardView } from './CardView';
 import { MeldsArea } from './MeldsArea';
 import { HandCards } from './HandCards';
@@ -50,7 +50,6 @@ export function GameTable({ game }: { game: GameView }) {
   // Acma modu durumu
   const [openMode, setOpenMode] = useState(false);
   const [openKind, setOpenKind] = useState<'per' | 'cift' | 'lay' | 'layCift'>('per');
-  const [currentType, setCurrentType] = useState<MeldType>('run');
   const [currentSel, setCurrentSel] = useState<string[]>([]);
   const [staged, setStaged] = useState<BuiltMeld[]>([]);
   const [stagedPairs, setStagedPairs] = useState<Card[][]>([]);
@@ -269,7 +268,7 @@ export function GameTable({ game }: { game: GameView }) {
   const addMeld = () => {
     setLocalMsg(null);
     const cards = currentSel.map(cardById).filter(Boolean) as Card[];
-    const res = buildMeld(currentType, cards);
+    const res = detectAndBuildMeld(cards);
     if ('error' in res) {
       setLocalMsg(res.error);
       return;
@@ -277,6 +276,9 @@ export function GameTable({ game }: { game: GameView }) {
     setStaged((prev) => [...prev, res]);
     setCurrentSel([]);
   };
+
+  const canOrganizeHand =
+    !openMode && processMode === 'off' && !jokerMode;
 
   const addPair = () => {
     setLocalMsg(null);
@@ -919,20 +921,10 @@ export function GameTable({ game }: { game: GameView }) {
           <div className="open-panel">
             <div className="open-row">
               <span className="sort-label">
-                {openKind === 'lay' ? 'Per indir — elinden masaya' : 'Per türü:'}
+                {openKind === 'lay'
+                  ? 'Per indir — kağıt seç, peri ekle'
+                  : 'Per aç — kağıt seç, peri ekle'}
               </span>
-              <button
-                className={currentType === 'run' ? 'chip on' : 'chip'}
-                onClick={() => setCurrentType('run')}
-              >
-                Sıralı
-              </button>
-              <button
-                className={currentType === 'group' ? 'chip on' : 'chip'}
-                onClick={() => setCurrentType('group')}
-              >
-                Erkek
-              </button>
               <button className="chip" onClick={addMeld} disabled={currentSel.length < 3}>
                 Peri ekle ({currentSel.length})
               </button>
@@ -1003,7 +995,7 @@ export function GameTable({ game }: { game: GameView }) {
 
         <HandCards
           cards={handCardsForDisplay}
-          draggable={!openMode && processMode === 'off' && !jokerMode}
+          draggable={canOrganizeHand}
           onReorder={handleReorder}
           isSelected={(c) =>
             openMode
@@ -1014,10 +1006,14 @@ export function GameTable({ game }: { game: GameView }) {
                   ? jokerCardId === c.id
                   : selectedId === c.id
           }
-          onCardClick={openMode || canDiscard ? onCardClick : undefined}
+          onCardClick={
+            openMode || canDiscard || (processMode === 'hand' && myTurn) || jokerMode
+              ? onCardClick
+              : undefined
+          }
         />
-        {sortMode === 'none' && !openMode && (
-          <p className="drag-hint">Kağıtları sürükleyerek elini dizebilirsin.</p>
+        {canOrganizeHand && (
+          <p className="drag-hint">Kağıtları sürükleyerek elini dizebilirsin (sıra sende olmasa da).</p>
         )}
 
         {canFinishAction &&
