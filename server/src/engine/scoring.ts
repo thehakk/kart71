@@ -289,7 +289,7 @@ export function scoreHand(
     };
   }) as [TeamHandBreakdown, TeamHandBreakdown];
 
-  const [raw0, raw1] = breakdown.map((b) => b.base) as [number, number];
+  const [raw0, raw1] = breakdown.map((b) => b.total) as [number, number];
   const rawTotals: [number, number] = [raw0, raw1];
 
   let winnerTeam: Team | null = null;

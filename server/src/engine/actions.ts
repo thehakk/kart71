@@ -62,10 +62,13 @@ export function drawFromPile(state: GameState, seat: Seat): { handEnded: boolean
     applyHandScore(state, scoreHand(state, null));
     return { handEnded: true };
   }
+  for (const p of state.players) p.emptiedDeckThisTurn = false;
+  const wasLastCard = state.drawPile.length === 1;
   const card = state.drawPile.shift()!; // index 0 = ust
   if (card.id === state.taban.id)
     throw new ActionError('Taban kartı yalnızca masada kalır; çekilemez.');
   state.players[seat].hand.push(card);
+  state.players[seat].emptiedDeckThisTurn = wasLastCard;
   state.takeBlocked = false;
   state.phase = 'discard';
   return { handEnded: false };
@@ -135,6 +138,7 @@ export function takeDiscard(state: GameState, seat: Seat, ask: boolean): void {
       throw new ActionError('Taban açılış kartı olarak alınamaz.');
     state.discardPile.pop();
     player.hand.push(top);
+    player.emptiedDeckThisTurn = false;
     state.phase = 'discard';
     return;
   }
@@ -156,6 +160,7 @@ export function takeDiscard(state: GameState, seat: Seat, ask: boolean): void {
     }
     state.discardPile.pop();
     player.hand.push(top);
+    player.emptiedDeckThisTurn = false;
     state.phase = 'discard';
     return;
   }
@@ -479,12 +484,14 @@ export function isIslekDiscard(state: GameState, card: Card): boolean {
   return state.melds.some((m) => canUseCardOnMeld(m, card));
 }
 
-/** Islek cezasi: acmamis veya per acip hic islememis atan yazar; islemis per oyuncu muaf. */
+/** Islek cezasi: acmamis, ciftci/cift acan veya per acip hic islememis atan yazar. */
 function throwerLiableForIslek(
   state: GameState,
   thrower: GameState['players'][number]
 ): boolean {
+  if (thrower.isCiftci) return true;
   if (!playerHasOpened(thrower, state)) return true;
+  if (thrower.openType === 'cift') return true;
   if (thrower.openType === 'per' && !thrower.hasProcessed) return true;
   return false;
 }
@@ -495,9 +502,9 @@ function shouldApplyIslekPenalty(
   card: Card
 ): boolean {
   if (!isIslekDiscard(state, card)) return false;
-  // Deste bittikten sonra masada acilis varsa son atik islek sayilmaz.
-  if (deckEmptyBlocksDiscardTake(state) && anyoneOpened(state)) return false;
   const thrower = state.players[discarderSeat];
+  // Desteden son karti cekenin atisi: masada acilis varsa islek sayilmaz.
+  if (thrower.emptiedDeckThisTurn && anyoneOpened(state)) return false;
   if (!throwerLiableForIslek(state, thrower)) return false;
   return true;
 }
@@ -536,6 +543,7 @@ export function discardCard(state: GameState, seat: Seat, cardId: string): void 
   state.discardPile.push(card);
   state.discardsMade += 1;
   state.lastDiscarderSeat = seat;
+  player.emptiedDeckThisTurn = false;
 
   state.takeBlocked = false;
   state.turnSeat = nextSeat(seat);
@@ -688,9 +696,11 @@ export function finishHand(state: GameState, seat: Seat, req: FinishReq): void {
       : 'per';
 
   player.hand = hand.filter((c) => !used.has(c.id));
+  applyIslekPenaltyOnDiscard(state, seat, discardCard);
   state.discardPile.push(discardCard);
   state.discardsMade += 1;
   state.lastDiscarderSeat = seat;
+  player.emptiedDeckThisTurn = false;
 
   const finishInfo: FinishInfo = {
     winnerSeat: seat,

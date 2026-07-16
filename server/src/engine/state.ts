@@ -30,6 +30,8 @@ export interface EnginePlayer {
   pairs: Card[][]; // acilan ciftler
   /** Per acip en az bir kez isleme yapti (islek cezasi muafiyeti). */
   hasProcessed: boolean;
+  /** Bu tur destenin son kartini cekti (deste bitti atisinda islek muafiyeti). */
+  emptiedDeckThisTurn: boolean;
 }
 
 export interface GameState {
@@ -144,6 +146,7 @@ export function createGameState(
     openType: 'none',
     pairs: [],
     hasProcessed: false,
+    emptiedDeckThisTurn: false,
   }));
 
   return {
