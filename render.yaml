@@ -3,7 +3,7 @@ services:
     name: kart71-server
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run build --workspace server
+    buildCommand: npm ci --include=dev && npm run build --workspace server
     startCommand: node server/dist/index.js
     healthCheckPath: /health
     envVars:
@@ -11,3 +11,5 @@ services:
         value: production
       - key: CLIENT_ORIGIN
         value: https://kart71.vercel.app
+      - key: NODE_VERSION
+        value: 22.16.0
