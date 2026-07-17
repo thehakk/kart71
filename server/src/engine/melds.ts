@@ -236,11 +236,16 @@ export function resolveWildInPair(
   pair: Card[],
   taban: Card
 ): { suit: Suit; rank: Rank } | null {
+  // Joker varsa diger kart gercek kopyadir (taban ile ayni rank/suit olsa bile).
+  const anchor = pair.find((c) => !c.isJoker && c.suit && c.rank);
+  if (anchor) return { suit: anchor.suit!, rank: anchor.rank! };
   const real = pair.find((c) => !isPairWild(c, taban));
-  if (!real || !real.suit || !real.rank) return null;
+  if (!real?.suit || !real?.rank) return null;
   return { suit: real.suit, rank: real.rank };
 }
 
 export function findWildIndex(pair: Card[], taban: Card): number {
-  return pair.findIndex((c) => isPairWild(c, taban));
+  const jokerIdx = pair.findIndex((c) => c.isJoker);
+  if (jokerIdx !== -1) return jokerIdx;
+  return pair.findIndex((c) => c.id === taban.id);
 }

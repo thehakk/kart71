@@ -108,6 +108,7 @@ export function canTakeTopDiscard(state: GameState, seat: Seat): boolean {
     return top.id !== state.taban.id;
   if (deckEmptyBlocksDiscardTake(state)) return false;
   if (isWildCard(state, top)) return false;
+  if (isIslekDiscard(state, top)) return false;
   if (player.isCiftci) return ciftciCanTakeDiscard(state, player, top);
   return true;
 }
@@ -176,6 +177,8 @@ export function takeDiscard(state: GameState, seat: Seat, ask: boolean): void {
     state.phase = 'await';
   } else {
     // sormadan al -> ciftci ol (per acan haric)
+    if (isIslekDiscard(state, top))
+      throw new ActionError('İşlek atık alınamaz; desteden çek.');
     if (player.openType === 'per')
       throw new ActionError('Per açtıktan sonra çiftçi olamazsın.');
     state.discardPile.pop();
@@ -477,11 +480,29 @@ function canUseCardOnMeld(meld: Meld, card: Card): boolean {
   return tryAddToMeld(meld, card) != null || cardMatchesMeldJoker(meld, card);
 }
 
-/** Yerde per varken kart bir pere islenebiliyor veya joker yerine gecebiliyorsa islek. */
+/** Kart, cifteki wild (joker/taban) yerine geciyorsa islek sayilir. */
+function cardMatchesPairWild(
+  state: GameState,
+  card: Card,
+  pair: Card[]
+): boolean {
+  if (card.isJoker || !card.suit || !card.rank) return false;
+  if (findWildIndex(pair, state.taban) === -1) return false;
+  const expected = resolveWildInPair(pair, state.taban);
+  if (!expected) return false;
+  return card.suit === expected.suit && card.rank === expected.rank;
+}
+
+/** Yerde per/cift varken kart islenebiliyor veya wild yerine gecebiliyorsa islek. */
 export function isIslekDiscard(state: GameState, card: Card): boolean {
-  if (state.melds.length === 0) return false;
   if (isWildCard(state, card)) return false;
-  return state.melds.some((m) => canUseCardOnMeld(m, card));
+  if (state.melds.some((m) => canUseCardOnMeld(m, card))) return true;
+  for (const p of state.players) {
+    for (const pair of p.pairs) {
+      if (cardMatchesPairWild(state, card, pair)) return true;
+    }
+  }
+  return false;
 }
 
 /** Islek cezasi: acmamis, ciftci/cift acan veya per acip hic islememis atan yazar. */
@@ -841,6 +862,8 @@ function canSwapWildInPair(
 ): boolean {
   const player = state.players[seat];
   const owner = state.players[ownerSeat];
+  if (seat === ownerSeat && player.openType === 'cift' && player.hasOpened)
+    return true;
   if (player.openType === 'per' && player.hasOpened) return true;
   if (
     player.isCiftci &&
@@ -927,5 +950,36 @@ export function swapWildInPair(
   const wild = pair[wIdx];
   pair[wIdx] = card;
   player.hand.splice(handIdx, 1);
+  player.hand.push(wild);
+}
+
+// Atik ustundeki karti cifte wild yerine koy, wild'i ele al (islek atik isleme).
+export function swapWildFromDiscard(
+  state: GameState,
+  seat: Seat,
+  ownerSeat: Seat,
+  pairIndex: number
+): void {
+  requireDiscardPhase(state, seat);
+  const player = state.players[seat];
+  if (!player.hasOpened) throw new ActionError('Joker almak için önce açmalısın.');
+  if (!canSwapWildInPair(state, seat, ownerSeat))
+    throw new ActionError('Bu çifteki jokeri alamazsın.');
+
+  const top = state.discardPile[state.discardPile.length - 1];
+  if (!top) throw new ActionError('Atıkta kağıt yok.');
+  if (isWildCard(state, top)) throw new ActionError('Joker/taban işlenemez.');
+
+  const owner = state.players[ownerSeat];
+  const pair = owner.pairs[pairIndex];
+  if (!pair) throw new ActionError('Çift bulunamadı.');
+  const wIdx = findWildIndex(pair, state.taban);
+  if (wIdx === -1) throw new ActionError('Bu çiftte joker/taban yok.');
+  if (!cardMatchesPairWild(state, top, pair))
+    throw new ActionError('Atıktaki kağıt bu çiftin wild yerine geçemez.');
+
+  const wild = pair[wIdx];
+  state.discardPile.pop();
+  pair[wIdx] = top;
   player.hand.push(wild);
 }

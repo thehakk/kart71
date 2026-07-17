@@ -18,6 +18,7 @@ import { toGameView, type GameState } from './engine/state.js';
 import {
   ActionError,
   canAskForDiscard,
+  canTakeTopDiscard,
   finishHand,
   openMelds,
   layMelds,
@@ -29,6 +30,7 @@ import {
   respondDiscard,
   swapJokerInMeld,
   swapWildInPair,
+  swapWildFromDiscard,
   takeDiscard,
   drawFromPile,
   discardCard,
@@ -92,6 +94,7 @@ function broadcastGame(code: string) {
         const view = {
           ...toGameView(room.game, seat),
           discardAskable: canAskForDiscard(room.game, seat),
+          discardTakeable: canTakeTopDiscard(room.game, seat),
           ...(room.game.phase === 'ended'
             ? { handContinue: room.handContinueView(seat) }
             : {}),
@@ -370,6 +373,16 @@ io.on('connection', (socket) => {
         payload?.ownerSeat ?? 0,
         payload?.pairIndex ?? 0,
         payload?.cardId ?? ''
+      )
+    )
+  );
+  socket.on('meld:swapWildFromDiscard', (payload) =>
+    runTurnAction((g, seat) =>
+      swapWildFromDiscard(
+        g,
+        seat,
+        payload?.ownerSeat ?? 0,
+        payload?.pairIndex ?? 0
       )
     )
   );

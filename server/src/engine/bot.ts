@@ -20,6 +20,7 @@ import {
   type FinishReq,
   type OpenMeldReq,
 } from './actions.js';
+import { anyoneOpened } from './state.js';
 
 export type BotTurnResult = 'handEnded' | 'continue' | 'noop';
 
@@ -119,14 +120,14 @@ function pickSafeDiscard(state: GameState, hand: Card[], taban: Card): Card | nu
 
 function pickBotDiscard(state: GameState, hand: Card[], taban: Card, isCiftci: boolean): Card {
   const desperate = state.drawPile.length <= 2;
-  if (state.melds.length > 0) {
+  if (anyoneOpened(state)) {
     const safe = pickSafeDiscard(state, hand, taban);
     if (safe) return safe;
   }
   if (isCiftci) {
     if (desperate) return pickHighestNonWild(hand, taban.id);
     const ciftciPick = pickCiftciDiscard(hand, taban);
-    if (state.melds.length === 0 || !isIslekDiscard(state, ciftciPick)) return ciftciPick;
+    if (!anyoneOpened(state) || !isIslekDiscard(state, ciftciPick)) return ciftciPick;
     const safe = pickSafeDiscard(state, hand, taban);
     if (safe) return safe;
     return ciftciPick;

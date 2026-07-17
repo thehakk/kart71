@@ -130,6 +130,7 @@ export interface GameView {
   discardCount: number;
   discardsMade: number;
   discardAskable?: boolean;
+  discardTakeable?: boolean;
   visibleDiscards: Card[] | null;
   bothTeamsCiftci: boolean;
   taban: Card;
@@ -218,6 +219,7 @@ export interface ClientToServerEvents {
   'meld:processDiscard': (payload: { meldId: string }) => void;
   'meld:swapJoker': (payload: { meldId: string; cardId: string }) => void;
   'meld:swapJokerPair': (payload: { ownerSeat: Seat; pairIndex: number; cardId: string }) => void;
+  'meld:swapWildFromDiscard': (payload: { ownerSeat: Seat; pairIndex: number }) => void;
   'meld:finish': (payload: {
     melds?: { type: MeldType; cardIds: string[] }[];
     pairs?: string[][];

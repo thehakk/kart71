@@ -147,6 +147,7 @@ export interface GameView {
   discardCount: number;
   discardsMade: number; // 0 = henuz ilk atim yok (acilis karti alinabilir)
   discardAskable?: boolean; // islek/joker/taban haric sorarak alinabilir
+  discardTakeable?: boolean; // islek/joker/taban/deste-bitti haric atik alinabilir
   visibleDiscards: Card[] | null; // ciftci gorunurlugu: izinliyse tum atiklar
   bothTeamsCiftci: boolean; // iki takimda da ciftci varsa herkes gorur
   taban: Card; // yere acilan gosterge; cekilemez
@@ -232,6 +233,7 @@ export interface ClientToServerEvents {
   // Joker el degistirme (M5)
   'meld:swapJoker': (payload: { meldId: string; cardId: string }) => void;
   'meld:swapJokerPair': (payload: { ownerSeat: Seat; pairIndex: number; cardId: string }) => void;
+  'meld:swapWildFromDiscard': (payload: { ownerSeat: Seat; pairIndex: number }) => void;
   // Bitir (M6): kalan per/ciftleri indir + son karti at
   'meld:finish': (payload: {
     melds?: { type: MeldType; cardIds: string[] }[];

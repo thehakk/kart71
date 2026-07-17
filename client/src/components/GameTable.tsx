@@ -39,6 +39,14 @@ function validatePairClient(a: Card, b: Card, taban: Card): string | null {
   return null;
 }
 
+function discardMatchesPairWild(top: Card, pair: Card[], taban: Card): boolean {
+  if (top.isJoker || isPairWildClient(top, taban)) return false;
+  if (!top.suit || !top.rank) return false;
+  const anchor = pair.find((c) => !c.isJoker && c.suit && c.rank);
+  if (!anchor?.suit || !anchor?.rank) return false;
+  return top.suit === anchor.suit && top.rank === anchor.rank;
+}
+
 function seatOpenLabel(p: GameView['seats'][number]): { long: string; short: string } | null {
   if (!p.hasOpened) return null;
   if (p.openType === 'cift') {
@@ -101,14 +109,15 @@ export function GameTable({ game }: { game: GameView }) {
   const required = game.requiredOpen;
   const requiredPairs = game.requiredPairs;
   const discardTakeable =
-    game.discardTop != null &&
-    !deckEmpty &&
-    (isOpeningTake
-      ? game.discardTop.id !== game.taban.id
-      : meInfo.isCiftci
-        ? !game.discardTop.isJoker &&
-          !isPairWildClient(game.discardTop, game.taban)
-        : !game.discardTop.isJoker && game.discardTop.id !== game.taban.id);
+    game.discardTakeable ??
+    (game.discardTop != null &&
+      !deckEmpty &&
+      (isOpeningTake
+        ? game.discardTop.id !== game.taban.id
+        : meInfo.isCiftci
+          ? !game.discardTop.isJoker &&
+            !isPairWildClient(game.discardTop, game.taban)
+          : !game.discardTop.isJoker && game.discardTop.id !== game.taban.id));
   const pendingForMe = game.pending?.discarderSeat === me;
   const iAsked = game.pending?.askerSeat === me;
   const canProcess =
@@ -465,18 +474,23 @@ export function GameTable({ game }: { game: GameView }) {
       setJokerCardId(null);
     }
   };
-  const onPairClick = (ownerSeat: Seat, pairIndex: number) => {
+  const onPairClick = (ownerSeat: Seat, pairIndex: number, pair: Card[]) => {
     if (!jokerMode) return;
-    if (!jokerCardId) {
-      setLocalMsg('Önce elinden jokerin yerine koyacağın kağıdı seç.');
+    if (jokerCardId) {
+      socket.emit('meld:swapJokerPair', {
+        ownerSeat,
+        pairIndex,
+        cardId: jokerCardId,
+      });
+      setJokerCardId(null);
       return;
     }
-    socket.emit('meld:swapJokerPair', {
-      ownerSeat,
-      pairIndex,
-      cardId: jokerCardId,
-    });
-    setJokerCardId(null);
+    if (game.discardTop && discardMatchesPairWild(game.discardTop, pair, game.taban)) {
+      socket.emit('meld:swapWildFromDiscard', { ownerSeat, pairIndex });
+      setJokerMode(false);
+      return;
+    }
+    setLocalMsg('Önce elinden jokerin yerine koyacağın kağıdı seç.');
   };
 
   const doDiscard = () => {
@@ -667,7 +681,7 @@ export function GameTable({ game }: { game: GameView }) {
                       className={`pair-group ${jokerMode && pairHasWild(pr) ? 'clickable' : ''}`}
                       onClick={
                         jokerMode && pairHasWild(pr)
-                          ? () => onPairClick(p.seat, idx)
+                          ? () => onPairClick(p.seat, idx, pr)
                           : undefined
                       }
                     >
@@ -844,7 +858,13 @@ export function GameTable({ game }: { game: GameView }) {
               <span className="muted">Deste bitti — son atık sorulamaz ve alınamaz.</span>
             )}
             {!deckEmpty && game.discardAskable === false && game.discardTop && (
-              <span className="muted">İşlek atık sorulamaz — desteden çek.</span>
+              <span className="muted">
+                İşlek atık alınamaz — desteden çek
+                {canSwapJoker && hasTableWild
+                  ? '; joker modunda uygun çifte dokunabilirsin'
+                  : ''}
+                .
+              </span>
             )}
           </div>
         )}
@@ -1170,7 +1190,9 @@ export function GameTable({ game }: { game: GameView }) {
             <span>
               {jokerCardId
                 ? 'Kağıt seçildi — jokerli pere veya çifte dokun.'
-                : 'Elinden jokerin yerine koyacağın kağıdı seç.'}
+                : game.discardTop
+                  ? 'Elinden kağıt seç veya atık uyuyorsa jokerli çifte doğrudan dokun.'
+                  : 'Elinden jokerin yerine koyacağın kağıdı seç.'}
             </span>
             <button className="chip" onClick={cancelJoker}>
               Vazgeç
