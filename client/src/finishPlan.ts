@@ -1,9 +1,17 @@
-import type { Card, MeldType, Rank } from '../shared/types.js';
-import type { GameState } from './state.js';
-import { eldenFinishAllowed } from './state.js';
-import { cardPoints } from './deck.js';
-import { validateMeld, validatePair, isPairWild, buildRunOrder } from './melds.js';
+import type { Card, MeldType, Rank } from './types';
+import {
+  buildRunOrder,
+  validateMeld,
+  validatePair,
+  isPairWild,
+  rankPoints,
+} from './meldBuild';
 
+function cardPoints(c: Card): number {
+  if (c.isJoker) return 25;
+  if (!c.rank) return 0;
+  return rankPoints(c.rank);
+}
 export interface MeldReq {
   type: MeldType;
   cardIds: string[];
@@ -475,37 +483,23 @@ export function findPerFinishPlan(
   return null;
 }
 
-/** Bitis icin per/cift/atilacak karti otomatik bul. */
-export function findFinishPlan(
-  state: GameState,
-  hand: Card[],
-  player: GameState['players'][number]
-): FinishPlan | null {
-  const taban = state.taban;
-  const allowDiscardOnly = player.hasOpened;
-  const preferJoker = !player.hasOpened && eldenFinishAllowed(state);
-  if (player.isCiftci || player.openType === 'cift') {
-    return findCiftFinishPlan(hand, taban, allowDiscardOnly, preferJoker);
-  }
-  return (
-    findPerFinishPlan(hand, taban, allowDiscardOnly, preferJoker) ??
-    findCiftFinishPlan(hand, taban, allowDiscardOnly, preferJoker)
-  );
-}
-
 /** Istemci: biter kagit secildikten sonra kalan el plani. */
-export function planFinishForPlayer(
-  state: GameState,
+export function planFinishForHand(
   hand: Card[],
-  player: GameState['players'][number],
-  discardCardId: string
+  taban: Card,
+  discardCardId: string,
+  opts: {
+    isCiftci: boolean;
+    openType: 'none' | 'per' | 'cift';
+    hasOpened: boolean;
+  }
 ): FinishPlan | null {
-  const allowDiscardOnly = player.hasOpened;
+  const allowDiscardOnly = opts.hasOpened;
   const mode: 'per' | 'cift' | 'auto' =
-    player.isCiftci || player.openType === 'cift'
+    opts.isCiftci || opts.openType === 'cift'
       ? 'cift'
-      : player.openType === 'per'
+      : opts.openType === 'per'
         ? 'per'
         : 'auto';
-  return planFinishWithDiscard(hand, state.taban, discardCardId, mode, allowDiscardOnly);
+  return planFinishWithDiscard(hand, taban, discardCardId, mode, allowDiscardOnly);
 }

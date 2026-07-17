@@ -68,18 +68,6 @@ export interface BuiltMeld {
 }
 
 // Secilen kagitlardan per turunu otomatik algila (once sirali, sonra erkek).
-export function detectAndBuildMeld(
-  selected: Card[]
-): BuiltMeld | { error: string } {
-  if (selected.length < 3) return { error: 'Per en az 3 kağıt olmalı.' };
-  const run = buildMeld('run', selected);
-  if (!('error' in run)) return run;
-  const group = buildMeld('group', selected);
-  if (!('error' in group)) return group;
-  return { error: 'Seçilen kağıtlar geçerli bir per oluşturmuyor.' };
-}
-
-// Secilen kagitlardan bir per olustur (dogrulama + puan). Hata varsa {error}.
 export function buildMeld(
   type: MeldType,
   selected: Card[]
@@ -112,4 +100,54 @@ export function buildMeld(
     return { error: 'Erkek perde aynı seri iki kez olamaz.' };
   const points = selected.length * rankPoints(rank);
   return { type, cards: selected, points };
+}
+
+export function detectAndBuildMeld(
+  selected: Card[]
+): BuiltMeld | { error: string } {
+  if (selected.length < 3) return { error: 'Per en az 3 kağıt olmalı.' };
+  const run = buildMeld('run', selected);
+  if (!('error' in run)) return run;
+  const group = buildMeld('group', selected);
+  if (!('error' in group)) return group;
+  return { error: 'Seçilen kağıtlar geçerli bir per oluşturmuyor.' };
+}
+
+export function isPairWild(c: Card, taban: Card): boolean {
+  if (c.isJoker) return true;
+  if (c.id === taban.id) return true;
+  if (
+    !taban.isJoker &&
+    taban.suit &&
+    taban.rank &&
+    c.suit === taban.suit &&
+    c.rank === taban.rank
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function validatePair(
+  a: Card,
+  b: Card,
+  taban: Card
+): { ok: true } | { ok: false; error: string } {
+  if (a.id === b.id) return { ok: false, error: 'Aynı kağıt iki kez kullanılamaz.' };
+  const aw = isPairWild(a, taban);
+  const bw = isPairWild(b, taban);
+  if (aw && bw) return { ok: false, error: 'Çiftte iki wild olamaz.' };
+  if (!aw && !bw && !(a.suit === b.suit && a.rank === b.rank)) {
+    return { ok: false, error: 'Çift birebir aynı kağıt olmalı.' };
+  }
+  return { ok: true };
+}
+
+export function validateMeld(
+  type: MeldType,
+  cards: Card[]
+): { ok: true; type: MeldType; points: number } | { ok: false; error: string } {
+  const built = buildMeld(type, cards);
+  if ('error' in built) return { ok: false, error: built.error };
+  return { ok: true, type: built.type, points: built.points };
 }

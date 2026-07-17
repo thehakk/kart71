@@ -591,7 +591,7 @@ export function finishHand(state: GameState, seat: Seat, req: FinishReq): void {
   let pairGroups = req.pairs ?? [];
   let discardCardId = req.discardCardId ?? '';
 
-  if (req.auto || (meldReqs.length === 0 && pairGroups.length === 0)) {
+  if (req.auto || (meldReqs.length === 0 && pairGroups.length === 0 && !discardCardId)) {
     let plan = findFinishPlan(state, player.hand, player);
     if (
       plan &&

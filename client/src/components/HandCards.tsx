@@ -48,12 +48,15 @@ function SortableCard({
 export function HandCards({
   cards,
   draggable,
+  externalDnd,
   onReorder,
   isSelected,
   onCardClick,
 }: {
   cards: Card[];
   draggable: boolean;
+  /** Ust bileşen DndContext sagliyorsa true (bitis slotu vb.). */
+  externalDnd?: boolean;
   onReorder: (newIds: string[]) => void;
   isSelected: (c: Card) => boolean;
   onCardClick?: (c: Card) => void;
@@ -95,20 +98,26 @@ export function HandCards({
     }
   };
 
+  const grid = (
+    <SortableContext items={ids} strategy={rectSortingStrategy}>
+      <div className="hand-cards hand-cards-grid" style={gridStyle}>
+        {cards.map((c) => (
+          <SortableCard
+            key={c.id}
+            card={c}
+            selected={isSelected(c)}
+            onClick={onCardClick ? () => onCardClick(c) : undefined}
+          />
+        ))}
+      </div>
+    </SortableContext>
+  );
+
+  if (externalDnd) return grid;
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-      <SortableContext items={ids} strategy={rectSortingStrategy}>
-        <div className="hand-cards hand-cards-grid" style={gridStyle}>
-          {cards.map((c) => (
-            <SortableCard
-              key={c.id}
-              card={c}
-              selected={isSelected(c)}
-              onClick={onCardClick ? () => onCardClick(c) : undefined}
-            />
-          ))}
-        </div>
-      </SortableContext>
+      {grid}
     </DndContext>
   );
 }

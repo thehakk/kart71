@@ -1227,6 +1227,59 @@ button.primary {
   font-weight: 700;
 }
 
+.finish-panel {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.finish-discard-slot {
+  min-height: 88px;
+  min-width: 64px;
+  border: 2px dashed rgba(21, 128, 61, 0.55);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: rgba(21, 128, 61, 0.08);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.finish-discard-slot.over {
+  border-color: var(--ok);
+  background: rgba(21, 128, 61, 0.18);
+}
+
+.finish-discard-slot.filled {
+  border-style: solid;
+}
+
+.finish-slot-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.35;
+  padding: 0 6px;
+}
+
+.finish-plan-preview,
+.finish-manual-bar,
+.finish-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.staged-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+
 /* ---- M7: skor tablosu & oyun sonu ---- */
 .scoreboard {
   text-align: left;

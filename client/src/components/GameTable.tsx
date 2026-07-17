@@ -1,8 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  closestCenter,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 import type { Card, GameView, Seat } from '../types';
 import { socket } from '../socket';
 import { arrangeHand, type SortMode } from '../handSort';
 import { detectAndBuildMeld, type BuiltMeld } from '../meldBuild';
+import { planFinishForHand, type FinishPlan } from '../finishPlan';
 import { CardBack, CardView } from './CardView';
 import { MeldsArea } from './MeldsArea';
 import { HandCards } from './HandCards';
@@ -11,6 +23,30 @@ import { EndHandsPanel } from './EndHandsPanel';
 import { Scoreboard } from './Scoreboard';
 
 const POSITIONS = ['bottom', 'left', 'top', 'right'] as const;
+const FINISH_DISCARD_SLOT_ID = 'finish-discard-slot';
+
+function FinishDiscardSlot({
+  card,
+  visible,
+}: {
+  card: Card | null;
+  visible: boolean;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: FINISH_DISCARD_SLOT_ID });
+  if (!visible) return null;
+  return (
+    <div
+      ref={setNodeRef}
+      className={`finish-discard-slot ${isOver ? 'over' : ''} ${card ? 'filled' : ''}`}
+    >
+      {card ? (
+        <CardView card={card} />
+      ) : (
+        <span className="finish-slot-label">Biter kağıt — buraya sürükle veya seç</span>
+      )}
+    </div>
+  );
+}
 
 // Istemci tarafi cift on-dogrulamasi (sunucu yine dogrular).
 function isPairWildClient(c: Card, taban: Card): boolean {
@@ -80,6 +116,18 @@ export function GameTable({ game }: { game: GameView }) {
   const [processStaged, setProcessStaged] = useState<{ meldId: string; cardId: string }[]>([]);
   const [jokerMode, setJokerMode] = useState(false);
   const [jokerCardId, setJokerCardId] = useState<string | null>(null);
+
+  const [finishMode, setFinishMode] = useState(false);
+  const [finishDiscardId, setFinishDiscardId] = useState<string | null>(null);
+  const [finishManualMode, setFinishManualMode] = useState(false);
+  const [finishCurrentSel, setFinishCurrentSel] = useState<string[]>([]);
+  const [finishStaged, setFinishStaged] = useState<BuiltMeld[]>([]);
+  const [finishStagedPairs, setFinishStagedPairs] = useState<Card[][]>([]);
+
+  const handDndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 0, tolerance: 8 } })
+  );
 
   const canDraw = myTurn && game.phase === 'draw';
   const EARLY_DISCARD_LIMIT = 4;
@@ -154,6 +202,12 @@ export function GameTable({ game }: { game: GameView }) {
       setProcessStaged([]);
       setJokerMode(false);
       setJokerCardId(null);
+      setFinishMode(false);
+      setFinishDiscardId(null);
+      setFinishManualMode(false);
+      setFinishStaged([]);
+      setFinishStagedPairs([]);
+      setFinishCurrentSel([]);
     }
   }, [canDiscard]);
 
@@ -235,8 +289,11 @@ export function GameTable({ game }: { game: GameView }) {
       new Set([
         ...staged.flatMap((m) => m.cards.map((c) => c.id)),
         ...stagedPairs.flatMap((pr) => pr.map((c) => c.id)),
+        ...finishStaged.flatMap((m) => m.cards.map((c) => c.id)),
+        ...finishStagedPairs.flatMap((pr) => pr.map((c) => c.id)),
+        ...(finishDiscardId ? [finishDiscardId] : []),
       ]),
-    [staged, stagedPairs]
+    [staged, stagedPairs, finishStaged, finishStagedPairs, finishDiscardId]
   );
 
   // Goruntu sirasi: 'none' ise manuel siralama, degilse otomatik dizim.
@@ -282,6 +339,16 @@ export function GameTable({ game }: { game: GameView }) {
       );
     } else if (jokerMode) {
       setJokerCardId((prev) => (prev === c.id ? null : c.id));
+    } else if (finishMode) {
+      if (finishManualMode) {
+        if (stagedIds.has(c.id)) return;
+        setFinishCurrentSel((prev) =>
+          prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id]
+        );
+      } else if (!finishDiscardId) {
+        setFinishDiscardId(c.id);
+        setLocalMsg(null);
+      }
     } else if (canDiscard) {
       setSelectedId((prev) => (prev === c.id ? null : c.id));
     }
@@ -300,7 +367,50 @@ export function GameTable({ game }: { game: GameView }) {
   };
 
   const canOrganizeHand =
-    !openMode && processMode === 'off' && !jokerMode;
+    !openMode && processMode === 'off' && !jokerMode && !finishManualMode;
+  const useHandDnd = canOrganizeHand || finishMode;
+
+  const finishDiscardCard = finishDiscardId
+    ? game.yourHand.find((c) => c.id === finishDiscardId) ?? null
+    : null;
+
+  const finishAutoPlan = useMemo((): FinishPlan | null => {
+    if (!finishDiscardId || finishManualMode) return null;
+    return planFinishForHand(game.yourHand, game.taban, finishDiscardId, {
+      isCiftci: meInfo.isCiftci,
+      openType: meInfo.openType ?? 'none',
+      hasOpened: meInfo.hasOpened,
+    });
+  }, [
+    finishDiscardId,
+    finishManualMode,
+    game.yourHand,
+    game.taban,
+    meInfo.isCiftci,
+    meInfo.openType,
+    meInfo.hasOpened,
+  ]);
+
+  const finishPlanPreview = useMemo(() => {
+    if (finishManualMode) {
+      if (finishStaged.length === 0 && finishStagedPairs.length === 0) return null;
+      return {
+        melds: finishStaged.map((m) => ({
+          type: m.type,
+          cardIds: m.cards.map((c) => c.id),
+        })),
+        pairs: finishStagedPairs.map((pr) => pr.map((c) => c.id)),
+        discardCardId: finishDiscardId ?? '',
+      } satisfies FinishPlan;
+    }
+    return finishAutoPlan;
+  }, [finishManualMode, finishStaged, finishStagedPairs, finishDiscardId, finishAutoPlan]);
+
+  const finishRestCount = useMemo(() => {
+    if (!finishDiscardId) return game.yourHand.length;
+    const used = new Set(stagedIds);
+    return game.yourHand.filter((c) => !used.has(c.id)).length;
+  }, [finishDiscardId, game.yourHand, stagedIds]);
 
   const addPair = () => {
     setLocalMsg(null);
@@ -502,9 +612,115 @@ export function GameTable({ game }: { game: GameView }) {
 
   const tryAutoFinish = () => {
     setLocalMsg(null);
-    setToast('Bitiş aranıyor…');
-    socket.emit('meld:finish', { auto: true });
+    setFinishMode(true);
+    setFinishDiscardId(null);
+    setFinishManualMode(false);
+    setFinishStaged([]);
+    setFinishStagedPairs([]);
+    setFinishCurrentSel([]);
+    setOpenMode(false);
+    setProcessMode('off');
+    setJokerMode(false);
+    setSelectedId(null);
   };
+
+  const cancelFinishMode = () => {
+    setFinishMode(false);
+    setFinishDiscardId(null);
+    setFinishManualMode(false);
+    setFinishStaged([]);
+    setFinishStagedPairs([]);
+    setFinishCurrentSel([]);
+    setLocalMsg(null);
+  };
+
+  const addFinishMeld = () => {
+    setLocalMsg(null);
+    const cards = finishCurrentSel.map(cardById).filter(Boolean) as Card[];
+    const res = detectAndBuildMeld(cards);
+    if ('error' in res) {
+      setLocalMsg(res.error);
+      return;
+    }
+    setFinishStaged((prev) => [...prev, res]);
+    setFinishCurrentSel([]);
+  };
+
+  const addFinishPair = () => {
+    setLocalMsg(null);
+    if (finishCurrentSel.length !== 2) {
+      setLocalMsg('Çift için tam 2 kağıt seç.');
+      return;
+    }
+    const cards = finishCurrentSel.map(cardById).filter(Boolean) as Card[];
+    const err = validatePairClient(cards[0], cards[1], game.taban);
+    if (err) {
+      setLocalMsg(err);
+      return;
+    }
+    setFinishStagedPairs((prev) => [...prev, cards]);
+    setFinishCurrentSel([]);
+  };
+
+  const confirmFinish = () => {
+    if (!finishDiscardId) {
+      setLocalMsg('Önce biter kağıdı seç veya sürükle.');
+      return;
+    }
+    const plan = finishPlanPreview;
+    if (!plan) {
+      setLocalMsg(
+        finishManualMode
+          ? 'Kalan kağıtları per veya çift olarak grupla.'
+          : 'Bu biter kağıtla el per/çift olarak kapanmıyor — manuel düzenlemeyi dene.'
+      );
+      return;
+    }
+    if (finishManualMode && finishRestCount > 0) {
+      setLocalMsg('Bitirmek için biter kağıt hariç tüm kağıtlar per/çift olmalı.');
+      return;
+    }
+    setLocalMsg(null);
+    socket.emit('meld:finish', {
+      melds: plan.melds,
+      pairs: plan.pairs,
+      discardCardId: finishDiscardId,
+    });
+  };
+
+  const handleHandDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over) return;
+    if (finishMode && over.id === FINISH_DISCARD_SLOT_ID) {
+      const cardId = String(active.id);
+      if (game.yourHand.some((c) => c.id === cardId)) {
+        setFinishDiscardId(cardId);
+        setFinishManualMode(false);
+        setFinishStaged([]);
+        setFinishStagedPairs([]);
+        setFinishCurrentSel([]);
+        setLocalMsg(null);
+      }
+      return;
+    }
+    if (canOrganizeHand && active.id !== over.id) {
+      const ids = handCardsForDisplay.map((c) => c.id);
+      const oldI = ids.indexOf(String(active.id));
+      const newI = ids.indexOf(String(over.id));
+      if (oldI !== -1 && newI !== -1) handleReorder(arrayMove(ids, oldI, newI));
+    }
+  };
+
+  useEffect(() => {
+    if (!finishMode || !finishDiscardId || finishManualMode) return;
+    if (finishAutoPlan === null) {
+      setLocalMsg(
+        'Otomatik per/çift bulunamadı — kalan kağıtları manuel grupla veya başka biter kağıt dene.'
+      );
+    } else {
+      setLocalMsg(null);
+    }
+  }, [finishMode, finishDiscardId, finishManualMode, finishAutoPlan]);
 
   return (
     <div className={`game ${handEnded ? 'hand-ended' : ''}`}>
@@ -1100,31 +1316,147 @@ export function GameTable({ game }: { game: GameView }) {
 
         {localMsg && <p className="error">{localMsg}</p>}
 
-        <HandCards
-          cards={handCardsForDisplay}
-          draggable={canOrganizeHand}
-          onReorder={handleReorder}
-          isSelected={(c) =>
-            openMode
-              ? currentSel.includes(c.id)
-              : processMode === 'hand'
-                ? processCardIds.includes(c.id) || processStaged.some((op) => op.cardId === c.id)
-                : jokerMode
-                  ? jokerCardId === c.id
-                  : selectedId === c.id
-          }
-          onCardClick={
-            openMode || canDiscard || (processMode === 'hand' && myTurn) || jokerMode
-              ? onCardClick
-              : undefined
-          }
-        />
+        {finishMode && (
+          <div className="finish-panel pending-panel">
+            <FinishDiscardSlot card={finishDiscardCard} visible />
+            {finishDiscardId && finishAutoPlan && !finishManualMode && (
+              <div className="finish-plan-preview">
+                <span className="muted">
+                  Kalan el: {(finishAutoPlan.melds?.length ?? 0) > 0
+                    ? `${finishAutoPlan.melds!.length} per`
+                    : `${finishAutoPlan.pairs?.length ?? 0} çift`}
+                  {finishDiscardCard?.isJoker ? ' — joker atışı (×2)' : ''}
+                </span>
+              </div>
+            )}
+            {finishDiscardId && !finishAutoPlan && !finishManualMode && (
+              <button
+                className="chip warn"
+                type="button"
+                onClick={() => {
+                  setFinishManualMode(true);
+                  setFinishStaged([]);
+                  setFinishStagedPairs([]);
+                  setFinishCurrentSel([]);
+                }}
+              >
+                Manuel grupla
+              </button>
+            )}
+            {finishManualMode && (
+              <div className="finish-manual-bar">
+                <span className="muted">
+                  {meInfo.openType === 'cift' || meInfo.isCiftci
+                    ? 'Kalan kağıtlardan çift oluştur.'
+                    : 'Kalan kağıtlardan per veya çift oluştur.'}
+                </span>
+                {(meInfo.openType !== 'cift' && !meInfo.isCiftci) && (
+                  <button className="chip on" type="button" onClick={addFinishMeld}>
+                    Per ekle
+                  </button>
+                )}
+                {(meInfo.openType === 'cift' ||
+                  meInfo.isCiftci ||
+                  meInfo.openType === 'none') && (
+                  <button className="chip on" type="button" onClick={addFinishPair}>
+                    Çift ekle
+                  </button>
+                )}
+              </div>
+            )}
+            {(finishStaged.length > 0 || finishStagedPairs.length > 0) && (
+              <div className="staged-preview">
+                {finishStaged.map((m, i) => (
+                  <span key={i} className="chip">
+                    {m.type === 'run' ? 'Sıra' : 'Erkek'} {m.points}
+                  </span>
+                ))}
+                {finishStagedPairs.map((_pr, i) => (
+                  <span key={`p${i}`} className="chip">
+                    Çift
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="finish-actions">
+              <button className="chip on finish-btn" type="button" onClick={confirmFinish}>
+                Bitir
+              </button>
+              <button className="chip" type="button" onClick={cancelFinishMode}>
+                Vazgeç
+              </button>
+            </div>
+          </div>
+        )}
+
+        {useHandDnd ? (
+          <DndContext
+            sensors={handDndSensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleHandDragEnd}
+          >
+            <HandCards
+              cards={handCardsForDisplay}
+              draggable
+              externalDnd
+              onReorder={handleReorder}
+              isSelected={(c) =>
+                finishMode
+                  ? finishManualMode
+                    ? finishCurrentSel.includes(c.id)
+                    : finishDiscardId === c.id
+                  : openMode
+                    ? currentSel.includes(c.id)
+                    : processMode === 'hand'
+                      ? processCardIds.includes(c.id) ||
+                        processStaged.some((op) => op.cardId === c.id)
+                      : jokerMode
+                        ? jokerCardId === c.id
+                        : selectedId === c.id
+              }
+              onCardClick={
+                openMode ||
+                finishMode ||
+                canDiscard ||
+                (processMode === 'hand' && myTurn) ||
+                jokerMode
+                  ? onCardClick
+                  : undefined
+              }
+            />
+          </DndContext>
+        ) : (
+          <HandCards
+            cards={handCardsForDisplay}
+            draggable={false}
+            onReorder={handleReorder}
+            isSelected={(c) =>
+              openMode
+                ? currentSel.includes(c.id)
+                : processMode === 'hand'
+                  ? processCardIds.includes(c.id) ||
+                    processStaged.some((op) => op.cardId === c.id)
+                  : jokerMode
+                    ? jokerCardId === c.id
+                    : selectedId === c.id
+            }
+            onCardClick={
+              openMode || canDiscard || (processMode === 'hand' && myTurn) || jokerMode
+                ? onCardClick
+                : undefined
+            }
+          />
+        )}
         {canOrganizeHand && (
           <p className="drag-hint">Kağıtları sürükleyerek elini dizebilirsin (sıra sende olmasa da).</p>
+        )}
+        {finishMode && !finishDiscardId && (
+          <p className="drag-hint">Biter kağıdı yukarıdaki slota sürükle veya elinden seç.</p>
         )}
 
         {canFinishAction &&
           !openMode &&
+          !finishMode &&
           processMode === 'off' &&
           !jokerMode && (
           <div className="take-bar">
@@ -1133,7 +1465,7 @@ export function GameTable({ game }: { game: GameView }) {
               onClick={tryAutoFinish}
               title={
                 game.eldenFinishAllowed
-                  ? 'Elden bitiş — 71/101 barajı aranmaz'
+                  ? 'Elden bitiş — önce biter kağıdı seç'
                   : `Perden bitiş — açış en az ${required} puan olmalı`
               }
             >
