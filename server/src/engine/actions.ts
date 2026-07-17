@@ -10,7 +10,7 @@ import {
 } from './state.js';
 import { isEarlyDiscardPhase, nextTurnSeat, prevTurnSeat } from './turn.js';
 import { validateMeld, validatePair, resolveJokerInRun, resolveJokerInGroup, resolveWildInPair, findWildIndex, buildRunOrder, isTabanLikeCard, discardHelpsPairs, discardHelpsCiftciPairs } from './melds.js';
-import { findFinishPlan, findCiftFinishPlan } from './finishPlan.js';
+import { findFinishPlan } from './finishPlan.js';
 import { applyHandScore, scoreHand, type FinishInfo } from './scoring.js';
 
 function markCiftci(state: GameState, seat: Seat): void {
@@ -592,15 +592,7 @@ export function finishHand(state: GameState, seat: Seat, req: FinishReq): void {
   let discardCardId = req.discardCardId ?? '';
 
   if (req.auto || (meldReqs.length === 0 && pairGroups.length === 0 && !discardCardId)) {
-    let plan = findFinishPlan(state, player.hand, player);
-    if (
-      plan &&
-      player.receivedAskDiscard &&
-      (plan.melds?.length ?? 0) > 0
-    ) {
-      plan =
-        findCiftFinishPlan(player.hand, state.taban, player.hasOpened) ?? null;
-    }
+    const plan = findFinishPlan(state, player.hand, player);
     if (!plan) throw new ActionError('Elin per veya çift olarak bitirilemedi.');
     meldReqs = plan.melds ?? [];
     pairGroups = plan.pairs ?? [];
@@ -608,10 +600,6 @@ export function finishHand(state: GameState, seat: Seat, req: FinishReq): void {
   }
 
   if (!discardCardId) throw new ActionError('Atılacak kağıt belirtilmedi.');
-  if (player.receivedAskDiscard && meldReqs.length > 0)
-    throw new ActionError(
-      'Sorarak alınan kartla perle bitiremezsin; per aç, çift aç veya çiftle bitir.'
-    );
   const hand = player.hand;
 
   const discardIdx = hand.findIndex((c) => c.id === discardCardId);
