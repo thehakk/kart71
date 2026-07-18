@@ -188,11 +188,10 @@ export function scoreHand(
     const winnerBase = finish.ciftFinish
       ? finishTeamBase(state, finisherTeam, finish, false)
       : 0;
-    // Kafa yalnizca elden bitiste; perden/çiftten bitiste masada zaten acilis vardir.
-    const kafa =
-      finish.eldenFinish && !teamHasOpener(state, loserTeam)
-        ? kafaBonus(finish.finisherOpenValue, finish.finisherPairCount)
-        : 0;
+    // Kafa: kaybeden takim acmadiysa bitirenin acilis kafasi kaybedene eklenir (elden veya perden/çiften).
+    const kafa = !teamHasOpener(state, loserTeam)
+      ? kafaBonus(finish.finisherOpenValue, finish.finisherPairCount)
+      : 0;
     const loserRaw = loserBase * mult + kafa + islek[loserTeam];
     const winnerRaw = winnerBase + islek[finisherTeam];
 
