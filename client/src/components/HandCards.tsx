@@ -18,6 +18,51 @@ export const HAND_ROWS = 3;
 export const HAND_MIN_COLS = 5;
 export const HAND_SLOT_PREFIX = 'hand-slot-';
 
+/** Hedef slota kart koy; doluysa alttakini ayni satirda saga kaydir. */
+export function insertCardIntoGrid(
+  slots: (string | null)[],
+  cardId: string,
+  targetIndex: number,
+  rows = HAND_ROWS
+): { slots: (string | null)[]; cols: number } {
+  const next = [...slots];
+
+  const ensureLen = (min: number) => {
+    while (next.length < min) next.push(null);
+  };
+
+  const placeWithCascade = (index: number, id: string): void => {
+    ensureLen(index + 1);
+    if (next[index] === null || next[index] === id) {
+      next[index] = id;
+      return;
+    }
+    const bumped = next[index]!;
+    next[index] = id;
+    placeWithCascade(index + rows, bumped);
+  };
+
+  const oldIdx = next.indexOf(cardId);
+  if (oldIdx !== -1) next[oldIdx] = null;
+
+  placeWithCascade(targetIndex, cardId);
+
+  const cols = Math.max(HAND_MIN_COLS, Math.ceil(next.length / rows));
+  return { slots: next, cols };
+}
+
+export function resolveHandDropSlot(
+  overId: string,
+  slots: (string | null)[]
+): number | null {
+  if (overId.startsWith(HAND_SLOT_PREFIX)) {
+    const index = Number.parseInt(overId.slice(HAND_SLOT_PREFIX.length), 10);
+    return Number.isNaN(index) ? null : index;
+  }
+  const index = slots.indexOf(overId);
+  return index === -1 ? null : index;
+}
+
 function DraggableCard({
   card,
   selected,
@@ -107,8 +152,8 @@ export function HandGrid({
     if (!over) return;
     const overId = String(over.id);
     if (!overId.startsWith(HAND_SLOT_PREFIX)) return;
-    const slotIndex = Number.parseInt(overId.slice(HAND_SLOT_PREFIX.length), 10);
-    if (Number.isNaN(slotIndex)) return;
+    const slotIndex = resolveHandDropSlot(overId, slots);
+    if (slotIndex === null) return;
     onMoveCard(String(active.id), slotIndex);
   };
 

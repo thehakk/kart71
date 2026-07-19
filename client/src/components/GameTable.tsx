@@ -15,7 +15,7 @@ import { detectAndBuildMeld, type BuiltMeld } from '../meldBuild';
 import { planFinishForHand, type FinishPlan } from '../finishPlan';
 import { CardBack, CardView } from './CardView';
 import { MeldsArea } from './MeldsArea';
-import { HandGrid, HAND_MIN_COLS, HAND_ROWS, HAND_SLOT_PREFIX } from './HandCards';
+import { HandGrid, HAND_MIN_COLS, HAND_ROWS, insertCardIntoGrid, resolveHandDropSlot } from './HandCards';
 import { HandResult } from './HandResult';
 import { EndHandsPanel } from './EndHandsPanel';
 import { Scoreboard } from './Scoreboard';
@@ -364,15 +364,10 @@ export function GameTable({ game }: { game: GameView }) {
 
   const moveCardToSlot = (cardId: string, slotIndex: number) => {
     setGridSlots((prev) => {
-      const minLen = (Math.floor(slotIndex / HAND_ROWS) + 1) * HAND_ROWS;
-      const next = [...prev];
-      while (next.length < minLen) next.push(null);
-      const oldIdx = next.indexOf(cardId);
-      if (oldIdx !== -1) next[oldIdx] = null;
-      next[slotIndex] = cardId;
-      return next;
+      const { slots, cols } = insertCardIntoGrid(prev, cardId, slotIndex);
+      setGridCols((c) => Math.max(c, cols, HAND_MIN_COLS));
+      return slots;
     });
-    setGridCols((c) => Math.max(c, Math.ceil((slotIndex + 1) / HAND_ROWS)));
     if (cardId === pendingDrawId) setPendingDrawId(null);
   };
 
@@ -774,14 +769,11 @@ export function GameTable({ game }: { game: GameView }) {
       return;
     }
     const overId = String(over.id);
-    if (
-      overId.startsWith(HAND_SLOT_PREFIX) &&
-      (canOrganizeHand || finishMode)
-    ) {
+    if (canOrganizeHand || finishMode) {
       const cardId = String(active.id);
       if (game.yourHand.some((c) => c.id === cardId)) {
-        const slotIndex = Number.parseInt(overId.slice(HAND_SLOT_PREFIX.length), 10);
-        if (!Number.isNaN(slotIndex)) moveCardToSlot(cardId, slotIndex);
+        const slotIndex = resolveHandDropSlot(overId, gridSlots);
+        if (slotIndex !== null) moveCardToSlot(cardId, slotIndex);
       }
     }
   };
