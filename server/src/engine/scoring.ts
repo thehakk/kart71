@@ -173,6 +173,21 @@ function applyIslekToDelta(
   return { teamDelta, penaltyTeam: t, penaltyAmount: amt };
 }
 
+/** Bitiren takimin acilis kafa bonusu (per veya cift). */
+function finisherOpeningKafa(state: GameState, finish: FinishInfo): number {
+  const p = state.players[finish.winnerSeat];
+  if (p.openType === 'cift' || (p.pairs.length > 0 && p.openType !== 'per')) {
+    return kafaBonus(0, p.pairs.length);
+  }
+  let openVal = Math.max(p.openedValue, finish.finisherOpenValue);
+  if (openVal <= 0) {
+    openVal = state.melds
+      .filter((m) => m.ownerSeat === finish.winnerSeat)
+      .reduce((s, m) => s + m.points, 0);
+  }
+  return kafaBonus(openVal, 0);
+}
+
 export function scoreHand(
   state: GameState,
   finish: FinishInfo | null
@@ -188,9 +203,9 @@ export function scoreHand(
     const winnerBase = finish.ciftFinish
       ? finishTeamBase(state, finisherTeam, finish, false)
       : 0;
-    // Kafa: kaybeden takim acmadiysa bitirenin acilis kafasi kaybedene eklenir (elden veya perden/çiften).
+    // Kafa: kaybeden takim acmadiysa bitirenin acilis kafasi kaybedene eklenir.
     const kafa = !teamHasOpener(state, loserTeam)
-      ? kafaBonus(finish.finisherOpenValue, finish.finisherPairCount)
+      ? finisherOpeningKafa(state, finish)
       : 0;
     const loserRaw = loserBase * mult + kafa + islek[loserTeam];
     const winnerRaw = winnerBase + islek[finisherTeam];

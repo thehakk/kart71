@@ -718,7 +718,9 @@ export function finishHand(state: GameState, seat: Seat, req: FinishReq): void {
     ciftFinish,
     jokerDiscard: discardCard.isJoker,
     finisherOpenValue:
-      player.openType === 'per' ? player.openedValue || meldTotal : 0,
+      player.openType === 'per' || built.length > 0
+        ? Math.max(player.openedValue, meldTotal)
+        : 0,
     finisherPairCount: player.pairs.length,
   };
 

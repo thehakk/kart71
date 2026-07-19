@@ -2,7 +2,7 @@ import type { Card, MeldType, Rank, Seat } from '../shared/types.js';
 import type { GameState } from './state.js';
 import { requiredOpenForGame, requiredPairsForGame } from './state.js';
 import { cardPoints } from './deck.js';
-import { validateMeld, validatePair, isPairWild, buildRunOrder, discardHelpsPairs, discardHelpsCiftciPairs } from './melds.js';
+import { validateMeld, validatePair, isPairWild, buildRunOrder, isTabanLikeCard, discardHelpsPairs, discardHelpsCiftciPairs } from './melds.js';
 import { kafaBonus } from './scoring.js';
 import { isEarlyDiscardPhase } from './turn.js';
 import { findFinishPlan, findOpenPlan, findPairGroups, findPerFinishPlan, findCiftFinishPlan } from './finishPlan.js';
@@ -118,21 +118,82 @@ function pickSafeDiscard(state: GameState, hand: Card[], taban: Card): Card | nu
   return pickHighestNonWild(pool, taban.id);
 }
 
-function pickBotDiscard(state: GameState, hand: Card[], taban: Card, isCiftci: boolean): Card {
+function isForbiddenCiftDiscard(c: Card, taban: Card): boolean {
+  return c.isJoker || isTabanLikeCard(c, taban);
+}
+
+function botGoingCift(
+  state: GameState,
+  player: GameState['players'][number]
+): boolean {
+  if (player.isCiftci || player.openType === 'cift') return true;
+  if (player.hasOpened) return false;
+  return countPairs(player.hand, state.taban) >= CIFT_MIN_PAIRS;
+}
+
+function pickBotDiscard(
+  state: GameState,
+  hand: Card[],
+  taban: Card,
+  isCiftci: boolean,
+  goingCift: boolean
+): Card {
   const desperate = state.drawPile.length <= 2;
   if (anyoneOpened(state)) {
     const safe = pickSafeDiscard(state, hand, taban);
     if (safe) return safe;
   }
-  if (isCiftci) {
-    if (desperate) return pickHighestNonWild(hand, taban.id);
-    const ciftciPick = pickCiftciDiscard(hand, taban);
+  if (isCiftci || goingCift) {
+    const allowed = hand.filter((c) => !isForbiddenCiftDiscard(c, taban));
+    const pool = allowed.length > 0 ? allowed : hand;
+    if (desperate) return pickHighestNonWild(pool, taban.id);
+    const ciftciPick = pickCiftciDiscard(pool, taban);
     if (!anyoneOpened(state) || !isIslekDiscard(state, ciftciPick)) return ciftciPick;
     const safe = pickSafeDiscard(state, hand, taban);
-    if (safe) return safe;
+    if (safe && !isForbiddenCiftDiscard(safe, taban)) return safe;
     return ciftciPick;
   }
-  return pickHighestNonWild(hand, taban.id);
+  const nonTaban = hand.filter((c) => !isForbiddenCiftDiscard(c, taban));
+  return pickHighestNonWild(nonTaban.length > 0 ? nonTaban : hand, taban.id);
+}
+
+/** Çifte gitmek için elde en az bu kadar tam çift (taban/joker dahil). */
+const CIFT_MIN_PAIRS = 3;
+/** 4. çift tamamlanmadan çiftçi olma (açma barajı ayrı: requiredPairs). */
+const CIFT_READY_PAIRS = 4;
+
+function countPairs(hand: Card[], taban: Card): number {
+  return findPairGroups(hand, taban).length;
+}
+
+function isPursuingCift(
+  player: GameState['players'][number],
+  pairCount: number
+): boolean {
+  return (
+    !player.hasOpened &&
+    (player.isCiftci || pairCount >= CIFT_MIN_PAIRS)
+  );
+}
+
+function isLastTwoDeckCycles(state: GameState): boolean {
+  return state.drawPile.length <= state.players.length * 2;
+}
+
+/** Kendi eli kafali per veya cift acisina uygun mu? */
+function botHandCanOpenWithKafa(state: GameState, hand: Card[], taban: Card): boolean {
+  const plan = findBestOpenPlan(hand, state);
+  if (plan.length > 0) {
+    const pts = openPlanPoints(hand, plan);
+    if (kafaBonus(pts, 0) > 0) return true;
+  }
+  const pairs = countPairs(hand, taban);
+  return kafaBonus(0, pairs) > 0;
+}
+
+function botCanFinishSoon(state: GameState, player: GameState['players'][number]): boolean {
+  if (player.hand.length <= 1) return true;
+  return !!findFinishPlan(state, player.hand, player);
 }
 
 function shouldWaitForKafa(state: GameState, openPts: number, pairCount: number): boolean {
@@ -147,10 +208,10 @@ function shouldWaitForKafa(state: GameState, openPts: number, pairCount: number)
 
 function shouldBecomeCiftci(state: GameState, hand: Card[], taban: Card): boolean {
   if (isEarlyDiscardPhase(state.discardsMade)) return false;
-  const pairs = findPairGroups(hand, taban);
-  if (isLate(state.handNumber)) return pairs.length >= 3;
-  if (isEarly(state.handNumber)) return pairs.length >= 5;
-  return pairs.length >= 4;
+  const pairs = countPairs(hand, taban);
+  if (pairs < CIFT_READY_PAIRS) return false;
+  if (isEarly(state.handNumber)) return pairs >= 5;
+  return pairs >= CIFT_READY_PAIRS;
 }
 
 function shouldOpenPerNow(state: GameState, hand: Card[]): boolean {
@@ -172,16 +233,16 @@ function shouldOpenPerNow(state: GameState, hand: Card[]): boolean {
 function shouldOpenPairsNow(state: GameState, hand: Card[], taban: Card): boolean {
   if (isEarlyDiscardPhase(state.discardsMade)) return false;
   const need = requiredPairs(state);
-  const pairs = findPairGroups(hand, taban);
-  if (pairs.length < need) return false;
+  const pairs = countPairs(hand, taban);
+  if (pairs < need) return false;
 
   if (findCiftFinishPlan(hand, taban)) return true;
-  if (shouldWaitForKafa(state, 0, pairs.length) && state.drawPile.length > 4) return false;
+  if (shouldWaitForKafa(state, 0, pairs) && state.drawPile.length > 4) return false;
 
-  if (pairs.length >= 7 || pairs.length >= 6) return true;
+  if (pairs >= 7 || pairs >= 6) return true;
   if (isLate(state.handNumber)) return true;
   if (!isEarly(state.handNumber)) return true;
-  return pairs.length >= need;
+  return pairs >= need;
 }
 
 function tryFinish(state: GameState, seat: Seat): boolean {
@@ -329,7 +390,13 @@ function botDiscard(state: GameState, seat: Seat): BotTurnResult {
 
   botTryProcessHand(state, seat);
 
-  const card = pickBotDiscard(state, player.hand, state.taban, player.isCiftci);
+  const card = pickBotDiscard(
+    state,
+    player.hand,
+    state.taban,
+    player.isCiftci,
+    botGoingCift(state, player)
+  );
   discardCard(state, seat, card.id);
   if (maybeAutoEndOnEmptyDeck(state)) return 'handEnded';
   return 'continue';
@@ -344,20 +411,28 @@ export function runBotTurn(state: GameState, seat: Seat): BotTurnResult {
   return 'noop';
 }
 
-/** Atan bot: cifte acma ihtimali yuksekse vermez (ciftci olur). */
+/** Atan bot: cifte giderken veya deste sonunda sorulan kağıdı vermez. */
 export function shouldBotGiveDiscard(state: GameState, responderSeat: Seat): boolean {
   const player = state.players[responderSeat];
   if (!player.isBot) return true;
-  if (player.isCiftci || player.hasOpened) return true;
 
-  const pairs = findPairGroups(player.hand, state.taban);
-  const need = requiredPairs(state);
+  const pairs = countPairs(player.hand, state.taban);
+
+  if (player.hasOpened && player.openType === 'per') return true;
+
+  if (isLastTwoDeckCycles(state)) {
+    if (botCanFinishSoon(state, player)) return true;
+    if (botHandCanOpenWithKafa(state, player.hand, state.taban)) return true;
+    return false;
+  }
+
+  if (isPursuingCift(player, pairs) && pairs >= CIFT_MIN_PAIRS) return false;
 
   if (shouldOpenPairsNow(state, player.hand, state.taban)) return false;
 
   if (
     shouldBecomeCiftci(state, player.hand, state.taban) &&
-    pairs.length >= Math.max(3, need - 1)
+    pairs >= CIFT_READY_PAIRS - 1
   ) {
     return false;
   }

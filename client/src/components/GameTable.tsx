@@ -9,15 +9,13 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { arrayMove } from '@dnd-kit/sortable';
 import type { Card, GameView, Seat } from '../types';
 import { socket } from '../socket';
-import { arrangeHand, type SortMode } from '../handSort';
 import { detectAndBuildMeld, type BuiltMeld } from '../meldBuild';
 import { planFinishForHand, type FinishPlan } from '../finishPlan';
 import { CardBack, CardView } from './CardView';
 import { MeldsArea } from './MeldsArea';
-import { HandCards } from './HandCards';
+import { HandGrid, HAND_MIN_COLS, HAND_ROWS, HAND_SLOT_PREFIX } from './HandCards';
 import { HandResult } from './HandResult';
 import { EndHandsPanel } from './EndHandsPanel';
 import { Scoreboard } from './Scoreboard';
@@ -98,8 +96,11 @@ export function GameTable({ game }: { game: GameView }) {
   const me = game.yourSeat;
   const meInfo = game.seats[me];
   const myTurn = game.turnSeat === me;
-  const [sortMode, setSortMode] = useState<SortMode>('per');
-  const [manualOrder, setManualOrder] = useState<string[]>([]);
+  const [gridCols, setGridCols] = useState(HAND_MIN_COLS);
+  const [gridSlots, setGridSlots] = useState<(string | null)[]>([]);
+  const [pendingDrawId, setPendingDrawId] = useState<string | null>(null);
+  const prevHandIdsRef = useRef<string[]>([]);
+  const handNumberRef = useRef(game.handNumber);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   // Acma modu durumu
@@ -296,31 +297,100 @@ export function GameTable({ game }: { game: GameView }) {
     [staged, stagedPairs, finishStaged, finishStagedPairs, finishDiscardId]
   );
 
-  // Goruntu sirasi: 'none' ise manuel siralama, degilse otomatik dizim.
-  // Her durumda eldeki gercek kagitlarla uzlastirilir (yeni cekilenler sona eklenir).
-  const displayHand = useMemo(() => {
-    const handIds = game.yourHand.map((c) => c.id);
-    const base =
-      sortMode === 'none'
-        ? manualOrder
-        : arrangeHand(game.yourHand, sortMode).map((c) => c.id);
-    const ordered = base.filter((id) => handIds.includes(id));
-    for (const id of handIds) if (!ordered.includes(id)) ordered.push(id);
-    const byId = new Map(game.yourHand.map((c) => [c.id, c]));
-    return ordered.map((id) => byId.get(id)!);
-  }, [game.yourHand, sortMode, manualOrder]);
-
-  const handleReorder = (newIds: string[]) => {
-    // Suruklenen sadece gorunur (staged olmayan) kagitlar; digerlerini koru.
-    const hidden = game.yourHand.map((c) => c.id).filter((id) => !newIds.includes(id));
-    setManualOrder([...newIds, ...hidden]);
-    setSortMode('none');
+  const initHandGrid = (handIds: string[]) => {
+    const cols = Math.max(HAND_MIN_COLS, Math.ceil(handIds.length / HAND_ROWS) + 1);
+    const slots: (string | null)[] = Array(cols * HAND_ROWS).fill(null);
+    let i = 0;
+    for (let c = 0; c < cols && i < handIds.length; c++) {
+      for (let r = 0; r < HAND_ROWS && i < handIds.length; r++) {
+        slots[c * HAND_ROWS + r] = handIds[i++];
+      }
+    }
+    setGridCols(cols);
+    setGridSlots(slots);
+    setPendingDrawId(null);
+    prevHandIdsRef.current = handIds;
   };
 
-  const handCardsForDisplay = useMemo(
-    () => displayHand.filter((c) => !stagedIds.has(c.id)),
-    [displayHand, stagedIds]
-  );
+  useEffect(() => {
+    handNumberRef.current = game.handNumber;
+    initHandGrid(game.yourHand.map((c) => c.id));
+  }, [game.handNumber]);
+
+  useEffect(() => {
+    const curr = game.yourHand.map((c) => c.id);
+    const prev = prevHandIdsRef.current;
+    if (curr.length === 0) {
+      prevHandIdsRef.current = curr;
+      return;
+    }
+    if (gridSlots.length === 0 && handNumberRef.current === game.handNumber) {
+      initHandGrid(curr);
+      return;
+    }
+
+    const added = curr.filter((id) => !prev.includes(id));
+    const removed = new Set(prev.filter((id) => !curr.includes(id)));
+
+    if (added.length === 1 && myTurn && game.phase === 'discard') {
+      setPendingDrawId(added[0]);
+    }
+
+    if (removed.size > 0 || added.length > 0) {
+      setGridSlots((slots) => {
+        let next = slots.map((id) => (id && !removed.has(id) ? id : null));
+        const placed = new Set(next.filter(Boolean) as string[]);
+        if (pendingDrawId && curr.includes(pendingDrawId)) placed.add(pendingDrawId);
+        for (const id of added) {
+          if (placed.has(id)) continue;
+          if (id === added[0] && added.length === 1 && myTurn && game.phase === 'discard') {
+            continue;
+          }
+          let emptyIdx = next.findIndex((s) => s === null);
+          if (emptyIdx === -1) {
+            next = [...next, ...Array(HAND_ROWS).fill(null)];
+            setGridCols((c) => c + 1);
+            emptyIdx = next.length - HAND_ROWS;
+          }
+          next[emptyIdx] = id;
+          placed.add(id);
+        }
+        return next;
+      });
+    }
+
+    prevHandIdsRef.current = curr;
+  }, [game.yourHand, game.phase, myTurn, gridSlots.length, pendingDrawId]);
+
+  const moveCardToSlot = (cardId: string, slotIndex: number) => {
+    setGridSlots((prev) => {
+      const minLen = (Math.floor(slotIndex / HAND_ROWS) + 1) * HAND_ROWS;
+      const next = [...prev];
+      while (next.length < minLen) next.push(null);
+      const oldIdx = next.indexOf(cardId);
+      if (oldIdx !== -1) next[oldIdx] = null;
+      next[slotIndex] = cardId;
+      return next;
+    });
+    setGridCols((c) => Math.max(c, Math.ceil((slotIndex + 1) / HAND_ROWS)));
+    if (cardId === pendingDrawId) setPendingDrawId(null);
+  };
+
+  const addHandColumn = () => {
+    setGridCols((c) => c + 1);
+    setGridSlots((prev) => [...prev, ...Array(HAND_ROWS).fill(null)]);
+  };
+
+  const pendingDrawCard = pendingDrawId
+    ? game.yourHand.find((c) => c.id === pendingDrawId) ?? null
+    : null;
+
+  const visibleGridSlots = useMemo(() => {
+    const hidden = stagedIds;
+    return gridSlots.map((id) =>
+      id && (hidden.has(id) || id === pendingDrawId) ? null : id
+    );
+  }, [gridSlots, stagedIds, pendingDrawId]);
 
   const stagedTotal = staged.reduce((s, m) => s + m.points, 0);
 
@@ -703,11 +773,16 @@ export function GameTable({ game }: { game: GameView }) {
       }
       return;
     }
-    if (canOrganizeHand && active.id !== over.id) {
-      const ids = handCardsForDisplay.map((c) => c.id);
-      const oldI = ids.indexOf(String(active.id));
-      const newI = ids.indexOf(String(over.id));
-      if (oldI !== -1 && newI !== -1) handleReorder(arrayMove(ids, oldI, newI));
+    const overId = String(over.id);
+    if (
+      overId.startsWith(HAND_SLOT_PREFIX) &&
+      (canOrganizeHand || finishMode)
+    ) {
+      const cardId = String(active.id);
+      if (game.yourHand.some((c) => c.id === cardId)) {
+        const slotIndex = Number.parseInt(overId.slice(HAND_SLOT_PREFIX.length), 10);
+        if (!Number.isNaN(slotIndex)) moveCardToSlot(cardId, slotIndex);
+      }
     }
   };
 
@@ -957,27 +1032,9 @@ export function GameTable({ game }: { game: GameView }) {
       <div className="my-hand">
         <div className="my-hand-head">
           <span>Elin ({game.yourHand.length})</span>
-          <div className="sort-controls">
-            <span className="sort-label">Diz:</span>
-            <button
-              className={sortMode === 'per' ? 'chip on' : 'chip'}
-              onClick={() => setSortMode('per')}
-            >
-              Pere göre
-            </button>
-            <button
-              className={sortMode === 'cift' ? 'chip on' : 'chip'}
-              onClick={() => setSortMode('cift')}
-            >
-              Çifte göre
-            </button>
-            <button
-              className={sortMode === 'none' ? 'chip on' : 'chip'}
-              onClick={() => setSortMode('none')}
-            >
-              Elle
-            </button>
-          </div>
+          <button type="button" className="chip" onClick={addHandColumn}>
+            + Boşluk
+          </button>
         </div>
 
         <div className="turn-status">
@@ -1395,11 +1452,14 @@ export function GameTable({ game }: { game: GameView }) {
             collisionDetection={closestCenter}
             onDragEnd={handleHandDragEnd}
           >
-            <HandCards
-              cards={handCardsForDisplay}
+            <HandGrid
+              slots={visibleGridSlots}
+              cols={gridCols}
+              cardById={cardById}
+              pendingCard={pendingDrawCard}
               draggable
               externalDnd
-              onReorder={handleReorder}
+              onMoveCard={moveCardToSlot}
               isSelected={(c) =>
                 finishMode
                   ? finishManualMode
@@ -1426,10 +1486,13 @@ export function GameTable({ game }: { game: GameView }) {
             />
           </DndContext>
         ) : (
-          <HandCards
-            cards={handCardsForDisplay}
+          <HandGrid
+            slots={visibleGridSlots}
+            cols={gridCols}
+            cardById={cardById}
+            pendingCard={pendingDrawCard}
             draggable={false}
-            onReorder={handleReorder}
+            onMoveCard={moveCardToSlot}
             isSelected={(c) =>
               openMode
                 ? currentSel.includes(c.id)
@@ -1448,7 +1511,9 @@ export function GameTable({ game }: { game: GameView }) {
           />
         )}
         {canOrganizeHand && (
-          <p className="drag-hint">Kağıtları sürükleyerek elini dizebilirsin (sıra sende olmasa da).</p>
+          <p className="drag-hint">
+            3 satırda istediğin gibi diz; çekilen kağıdı sağdan ele sürükle. Boşluk için + Boşluk.
+          </p>
         )}
         {finishMode && !finishDiscardId && (
           <p className="drag-hint">Biter kağıdı yukarıdaki slota sürükle veya elinden seç.</p>

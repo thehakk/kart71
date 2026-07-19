@@ -3,24 +3,22 @@ import {
   PointerSensor,
   TouchSensor,
   closestCenter,
+  useDraggable,
+  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  arrayMove,
-  rectSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { CSSProperties } from 'react';
 import type { Card } from '../types';
 import { CardView } from './CardView';
 
-const HAND_ROWS_MOBILE = 3;
+export const HAND_ROWS = 3;
+export const HAND_MIN_COLS = 5;
+export const HAND_SLOT_PREFIX = 'hand-slot-';
 
-function SortableCard({
+function DraggableCard({
   card,
   selected,
   onClick,
@@ -29,11 +27,11 @@ function SortableCard({
   selected: boolean;
   onClick?: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: card.id });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: card.id,
+  });
   const style: CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+    transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.65 : 1,
     touchAction: 'none',
     zIndex: isDragging ? 2 : undefined,
@@ -45,19 +43,52 @@ function SortableCard({
   );
 }
 
-export function HandCards({
-  cards,
+function HandSlot({
+  slotIndex,
+  card,
+  selected,
+  onClick,
+}: {
+  slotIndex: number;
+  card: Card | null;
+  selected: boolean;
+  onClick?: () => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `${HAND_SLOT_PREFIX}${slotIndex}` });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`hand-slot ${isOver ? 'over' : ''} ${card ? 'filled' : 'empty'}`}
+    >
+      {card ? (
+        <DraggableCard card={card} selected={selected} onClick={onClick} />
+      ) : (
+        <div className="hand-slot-placeholder" aria-hidden />
+      )}
+    </div>
+  );
+}
+
+export function HandGrid({
+  slots,
+  cols,
+  rows = HAND_ROWS,
+  cardById,
+  pendingCard,
   draggable,
   externalDnd,
-  onReorder,
+  onMoveCard,
   isSelected,
   onCardClick,
 }: {
-  cards: Card[];
+  slots: (string | null)[];
+  cols: number;
+  rows?: number;
+  cardById: (id: string) => Card | undefined;
+  pendingCard: Card | null;
   draggable: boolean;
-  /** Ust bileşen DndContext sagliyorsa true (bitis slotu vb.). */
   externalDnd?: boolean;
-  onReorder: (newIds: string[]) => void;
+  onMoveCard: (cardId: string, slotIndex: number) => void;
   isSelected: (c: Card) => boolean;
   onCardClick?: (c: Card) => void;
 }) {
@@ -66,52 +97,91 @@ export function HandCards({
     useSensor(TouchSensor, { activationConstraint: { delay: 0, tolerance: 8 } })
   );
 
-  const gridColsMobile = Math.max(1, Math.ceil(cards.length / HAND_ROWS_MOBILE));
-  const gridColsDesktop = Math.max(1, Math.ceil(cards.length / 2));
   const gridStyle = {
-    ['--hand-cols-mobile' as string]: String(gridColsMobile),
-    ['--hand-cols-desktop' as string]: String(gridColsDesktop),
+    ['--hand-cols' as string]: String(cols),
+    ['--hand-rows' as string]: String(rows),
   } as CSSProperties;
 
-  if (!draggable) {
-    return (
-      <div className="hand-cards hand-cards-grid" style={gridStyle}>
-        {cards.map((c) => (
-          <CardView
-            key={c.id}
-            card={c}
-            selected={isSelected(c)}
-            onClick={onCardClick ? () => onCardClick(c) : undefined}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  const ids = cards.map((c) => c.id);
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
-    if (over && active.id !== over.id) {
-      const oldI = ids.indexOf(String(active.id));
-      const newI = ids.indexOf(String(over.id));
-      if (oldI !== -1 && newI !== -1) onReorder(arrayMove(ids, oldI, newI));
-    }
+    if (!over) return;
+    const overId = String(over.id);
+    if (!overId.startsWith(HAND_SLOT_PREFIX)) return;
+    const slotIndex = Number.parseInt(overId.slice(HAND_SLOT_PREFIX.length), 10);
+    if (Number.isNaN(slotIndex)) return;
+    onMoveCard(String(active.id), slotIndex);
   };
 
   const grid = (
-    <SortableContext items={ids} strategy={rectSortingStrategy}>
+    <div className="hand-layout">
       <div className="hand-cards hand-cards-grid" style={gridStyle}>
-        {cards.map((c) => (
-          <SortableCard
-            key={c.id}
-            card={c}
-            selected={isSelected(c)}
-            onClick={onCardClick ? () => onCardClick(c) : undefined}
-          />
-        ))}
+        {Array.from({ length: cols * rows }, (_, slotIndex) => {
+          const id = slots[slotIndex] ?? null;
+          const card = id ? cardById(id) ?? null : null;
+          return (
+            <HandSlot
+              key={slotIndex}
+              slotIndex={slotIndex}
+              card={draggable && card ? card : card}
+              selected={card ? isSelected(card) : false}
+              onClick={card && onCardClick ? () => onCardClick(card) : undefined}
+            />
+          );
+        })}
       </div>
-    </SortableContext>
+      {pendingCard && (
+        <div className="hand-pending-draw">
+          <span className="hand-pending-label">Çekilen</span>
+          {draggable ? (
+            <DraggableCard
+              card={pendingCard}
+              selected={isSelected(pendingCard)}
+              onClick={onCardClick ? () => onCardClick(pendingCard) : undefined}
+            />
+          ) : (
+            <CardView
+              card={pendingCard}
+              selected={isSelected(pendingCard)}
+              onClick={onCardClick ? () => onCardClick(pendingCard) : undefined}
+            />
+          )}
+        </div>
+      )}
+    </div>
   );
+
+  if (!draggable) {
+    return (
+      <div className="hand-layout">
+        <div className="hand-cards hand-cards-grid" style={gridStyle}>
+          {Array.from({ length: cols * rows }, (_, slotIndex) => {
+            const id = slots[slotIndex] ?? null;
+            const card = id ? cardById(id) ?? null : null;
+            if (!card) return <div key={slotIndex} className="hand-slot empty" />;
+            return (
+              <div key={slotIndex} className="hand-slot filled">
+                <CardView
+                  card={card}
+                  selected={isSelected(card)}
+                  onClick={onCardClick ? () => onCardClick(card) : undefined}
+                />
+              </div>
+            );
+          })}
+        </div>
+        {pendingCard && (
+          <div className="hand-pending-draw">
+            <span className="hand-pending-label">Çekilen</span>
+            <CardView
+              card={pendingCard}
+              selected={isSelected(pendingCard)}
+              onClick={onCardClick ? () => onCardClick(pendingCard) : undefined}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (externalDnd) return grid;
 
@@ -119,5 +189,53 @@ export function HandCards({
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       {grid}
     </DndContext>
+  );
+}
+
+/** @deprecated HandGrid kullan */
+export function HandCards(props: {
+  cards: Card[];
+  draggable: boolean;
+  externalDnd?: boolean;
+  onReorder: (newIds: string[]) => void;
+  isSelected: (c: Card) => boolean;
+  onCardClick?: (c: Card) => void;
+}) {
+  const slots = props.cards.map((c) => c.id);
+  const cols = Math.max(HAND_MIN_COLS, Math.ceil(slots.length / HAND_ROWS));
+  const padded = Array(cols * HAND_ROWS).fill(null) as (string | null)[];
+  slots.forEach((id, i) => {
+    padded[i] = id;
+  });
+  return (
+    <HandGrid
+      slots={padded}
+      cols={cols}
+      cardById={(id) => props.cards.find((c) => c.id === id)}
+      pendingCard={null}
+      draggable={props.draggable}
+      externalDnd={props.externalDnd}
+      onMoveCard={(cardId, slotIndex) => {
+        const ids = props.cards.map((c) => c.id);
+        const oldI = ids.indexOf(cardId);
+        if (oldI === -1) return;
+        const next = [...ids];
+        next.splice(oldI, 1);
+        const targetId = padded[slotIndex];
+        if (targetId) {
+          const targetI = next.indexOf(targetId);
+          if (targetI !== -1) {
+            next.splice(targetI, 0, cardId);
+          } else {
+            next.splice(Math.min(slotIndex, next.length), 0, cardId);
+          }
+        } else {
+          next.splice(Math.min(slotIndex, next.length), 0, cardId);
+        }
+        props.onReorder(next);
+      }}
+      isSelected={props.isSelected}
+      onCardClick={props.onCardClick}
+    />
   );
 }
