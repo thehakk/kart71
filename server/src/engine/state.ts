@@ -26,6 +26,8 @@ export interface EnginePlayer {
   /** Sorarak alinan atik: per/cift/bitir yapilmadan atilirsa ciftci olunur. */
   receivedAskDiscard: boolean;
   openedValue: number;
+  /** Ilk cift acilisindaki cift sayisi (sonradan indirilenler kafaya eklenmez). */
+  openedPairCount: number;
   openType: OpenType;
   pairs: Card[][]; // acilan ciftler
   /** Per acip en az bir kez isleme yapti (islek cezasi muafiyeti). */
@@ -143,6 +145,7 @@ export function createGameState(
     isCiftci: false,
     receivedAskDiscard: false,
     openedValue: 0,
+    openedPairCount: 0,
     openType: 'none',
     pairs: [],
     hasProcessed: false,

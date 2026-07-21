@@ -435,6 +435,7 @@ export function openPairs(state: GameState, seat: Seat, pairIdGroups: string[][]
   player.pairs = builtPairs;
   player.hasOpened = true;
   player.openType = 'cift';
+  player.openedPairCount = builtPairs.length;
   markCiftci(state, seat);
   state.lastPairCount = builtPairs.length;
 }
@@ -691,8 +692,9 @@ export function finishHand(state: GameState, seat: Seat, req: FinishReq): void {
     if (!player.hasOpened) {
       player.hasOpened = true;
       player.openType = 'cift';
+      player.openedPairCount = builtPairs.length;
       markCiftci(state, seat);
-      state.lastPairCount = player.pairs.length;
+      state.lastPairCount = builtPairs.length;
     }
   }
 
@@ -717,11 +719,8 @@ export function finishHand(state: GameState, seat: Seat, req: FinishReq): void {
     eldenFinish,
     ciftFinish,
     jokerDiscard: discardCard.isJoker,
-    finisherOpenValue:
-      player.openType === 'per' || built.length > 0
-        ? Math.max(player.openedValue, meldTotal)
-        : 0,
-    finisherPairCount: player.pairs.length,
+    finisherOpenValue: player.openType === 'per' ? player.openedValue : 0,
+    finisherPairCount: player.openType === 'cift' ? player.openedPairCount : 0,
   };
 
   clearAskTakeObligation(player);

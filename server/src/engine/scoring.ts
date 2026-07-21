@@ -92,24 +92,29 @@ export function buildPlayerPenalties(state: GameState) {
   }));
 }
 
-/** Takimdaki acan oyuncularin en yuksek kafa bonusu. */
+/** Takimdaki acan oyuncularin en yuksek kafa bonusu (yalnizca ilk acilis anina gore). */
 function bestKafaOnTeam(state: GameState, team: Team): number {
   let best = 0;
   for (const p of state.players) {
     if (p.team !== team) continue;
     if (!playerHasOpened(p, state)) continue;
-    const k =
-      p.openType === 'cift' || p.pairs.length > 0
-        ? kafaBonus(0, p.pairs.length)
-        : kafaBonus(p.openedValue, 0);
-    best = Math.max(best, k);
+    best = Math.max(best, playerOpeningKafa(p));
   }
   return best;
 }
 
+/** Ilk acilis anindaki kafa — isleme / sonradan indirme puanlari sayilmaz. */
+function playerOpeningKafa(p: GameState['players'][number]): number {
+  if (p.openType === 'cift') return kafaBonus(0, p.openedPairCount);
+  if (p.openType === 'per') return kafaBonus(p.openedValue, 0);
+  return 0;
+}
+
 export function kafaBonus(openValue: number, pairCount: number): number {
+  // Cift: yalnizca acilis anindaki cift sayisi (6=1 kafa, 7=2 kafa).
   if (pairCount >= 7) return 200;
   if (pairCount >= 6) return 100;
+  // Per: 111-120=1, 121-130=2, 131-140=3, 141+=4 kafa.
   if (openValue >= 141) return 400;
   if (openValue >= 131) return 300;
   if (openValue >= 121) return 200;
@@ -173,19 +178,12 @@ function applyIslekToDelta(
   return { teamDelta, penaltyTeam: t, penaltyAmount: amt };
 }
 
-/** Bitiren takimin acilis kafa bonusu (per veya cift). */
+/** Bitiren takimin acilis kafa bonusu (ilk acilis anina gore). */
 function finisherOpeningKafa(state: GameState, finish: FinishInfo): number {
   const p = state.players[finish.winnerSeat];
-  if (p.openType === 'cift' || (p.pairs.length > 0 && p.openType !== 'per')) {
-    return kafaBonus(0, p.pairs.length);
-  }
-  let openVal = Math.max(p.openedValue, finish.finisherOpenValue);
-  if (openVal <= 0) {
-    openVal = state.melds
-      .filter((m) => m.ownerSeat === finish.winnerSeat)
-      .reduce((s, m) => s + m.points, 0);
-  }
-  return kafaBonus(openVal, 0);
+  if (p.hasOpened) return playerOpeningKafa(p);
+  if (finish.finisherPairCount > 0) return kafaBonus(0, finish.finisherPairCount);
+  return kafaBonus(finish.finisherOpenValue, 0);
 }
 
 export function scoreHand(
