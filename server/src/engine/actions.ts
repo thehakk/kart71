@@ -183,6 +183,7 @@ export function takeDiscard(state: GameState, seat: Seat, ask: boolean): void {
       throw new ActionError('Per açtıktan sonra çiftçi olamazsın.');
     state.discardPile.pop();
     player.hand.push(top);
+    player.emptiedDeckThisTurn = false;
     markCiftci(state, seat);
     state.phase = 'discard';
   }

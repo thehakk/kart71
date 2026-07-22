@@ -562,10 +562,12 @@ export function GameTable({ game }: { game: GameView }) {
     setLocalMsg(null);
   };
 
-  const takeDiscard = (ask: boolean) =>
+  const takeDiscard = (ask: boolean) => {
     socket.emit('turn:takeDiscard', { ask: meInfo.isCiftci ? false : ask });
+    setLocalMsg(null);
+  };
 
-  /** Ciftci: atiga tikla, sormadan dogrudan al. Acilis karti ayri kural. */
+  /** Atik al: acilis karti haric sormadan al = ciftci olur. */
   const takeTopDiscard = () => {
     if (!canDraw || !discardTakeable) return;
     if (isOpeningTake) {
@@ -576,7 +578,11 @@ export function GameTable({ game }: { game: GameView }) {
       takeDiscard(false);
       return;
     }
-    setLocalMsg('Atığı almak için aşağıdan "Sorarak al" veya "Sormadan al (çiftçi ol)" seç.');
+    if (meInfo.openType === 'per') {
+      setLocalMsg('Per açtığın için çiftçi olamazsın; sorarak al veya desteden çek.');
+      return;
+    }
+    takeDiscard(false);
   };
   const respond = (give: boolean) => socket.emit('discard:respond', { give });
 
@@ -1105,30 +1111,36 @@ export function GameTable({ game }: { game: GameView }) {
         )}
 
         {/* Atigi alma secenekleri (ciftci degilse) */}
-        {canDraw && discardTakeable && !meInfo.isCiftci && !isOpeningTake && !earlyPhase && (
+        {canDraw && discardTakeable && !meInfo.isCiftci && !isOpeningTake && meInfo.openType !== 'per' && (
           <div className="take-bar">
-            <button
-              className="chip on"
-              disabled={game.discardAskable === false}
-              onClick={() => takeDiscard(true)}
-            >
-              Sorarak al
-            </button>
-            {meInfo.openType !== 'per' && (
-              <button className="chip warn" onClick={() => takeDiscard(false)}>
-                Sormadan al (çiftçi ol)
+            {!earlyPhase && (
+              <button
+                type="button"
+                className="chip on"
+                disabled={game.discardAskable === false}
+                onClick={() => takeDiscard(true)}
+              >
+                Sorarak al
               </button>
             )}
+            <button type="button" className="chip warn" onClick={() => takeDiscard(false)}>
+              Sormadan al (çiftçi ol)
+            </button>
             {deckEmpty && game.discardTop && (
               <span className="muted">Deste bitti — son atık sorulamaz ve alınamaz.</span>
             )}
-            {!deckEmpty && game.discardAskable === false && game.discardTop && (
+            {!deckEmpty && !earlyPhase && game.discardAskable === false && game.discardTop && (
               <span className="muted">
                 İşlek atık alınamaz — desteden çek
                 {canSwapJoker && hasTableWild
                   ? '; joker modunda uygun çifte dokunabilirsin'
                   : ''}
                 .
+              </span>
+            )}
+            {earlyPhase && (
+              <span className="muted">
+                İlk {EARLY_DISCARD_LIMIT} atıkta per sorulamaz; sormadan al çiftçi yapar.
               </span>
             )}
           </div>
