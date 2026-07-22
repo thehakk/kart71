@@ -29,6 +29,19 @@ body {
   padding: 16px;
 }
 
+.app-credit {
+  position: fixed;
+  right: 12px;
+  bottom: 10px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  opacity: 0.7;
+  pointer-events: none;
+  user-select: none;
+  z-index: 50;
+}
+
 .topbar {
   display: flex;
   align-items: center;

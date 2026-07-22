@@ -48,8 +48,12 @@ function playerFinishHandPenalty(
   const handPts = p.hand.reduce((s, c) => s + cardPoints(c), 0);
   const opened = playerHasOpened(p, state);
   if (!onLoserTeam) return playerHandPenalty(p, state);
-  if (p.isCiftci && !opened) return 200;
-  if (p.isCiftci && opened) {
+  // Ciftci acmadi: 200; ciftten bitiste ek ×2 (400). Elden bitiste takim carpani uygulanir.
+  if (p.isCiftci && !opened) {
+    if (finish.ciftFinish && !finish.eldenFinish) return 400;
+    return 200;
+  }
+  if ((p.isCiftci || p.openType === 'cift') && opened) {
     let pen = handPts * 2;
     if (finish.ciftFinish) pen *= 2;
     return pen;
@@ -125,7 +129,7 @@ export function kafaBonus(openValue: number, pairCount: number): number {
 function finishMultiplier(info: FinishInfo): number {
   let m = 1;
   if (info.eldenFinish) m *= 2;
-  if (info.ciftFinish) m *= 2;
+  // ciftten bitis carpani oyuncu bazinda (200×2 / elde×4); tabana tekrar uygulanmaz.
   if (info.jokerDiscard) m *= 2;
   return m;
 }
@@ -178,7 +182,7 @@ function applyIslekToDelta(
   return { teamDelta, penaltyTeam: t, penaltyAmount: amt };
 }
 
-/** Bitiren takimin acilis kafa bonusu (ilk acilis anina gore). */
+/** Bitirenin kafa bonusu — yalnizca ilk acilis anina gore (sonradan 7. cift kafa eklemez). */
 function finisherOpeningKafa(state: GameState, finish: FinishInfo): number {
   const p = state.players[finish.winnerSeat];
   if (p.hasOpened) return playerOpeningKafa(p);
@@ -197,16 +201,26 @@ export function scoreHand(
     const loserTeam = (1 - finisherTeam) as Team;
     const mult = finishMultiplier(finish);
     const loserBase = finishTeamBase(state, loserTeam, finish, true);
-    // Perden bitiste biten takim 0; ciftten bitiste ortagin el cezasi dusulur (§8.4).
-    const winnerBase = finish.ciftFinish
-      ? finishTeamBase(state, finisherTeam, finish, false)
-      : 0;
-    // Kafa: kaybeden takim acmadiysa bitirenin acilis kafasi kaybedene eklenir.
-    const kafa = !teamHasOpener(state, loserTeam)
-      ? finisherOpeningKafa(state, finish)
-      : 0;
+    // Bitiste biten takim (ortagi dahil) 0 sayilir — ortak cezasi skordan dusulmez.
+    const winnerBase = 0;
+    // Kafa: bitirenin ilk acilis kafasi (7 cift / 111+ per) kaybedene eklenir.
+    const kafa = finisherOpeningKafa(state, finish);
     const loserRaw = loserBase * mult + kafa + islek[loserTeam];
     const winnerRaw = winnerBase + islek[finisherTeam];
+
+    const playerPenalties = state.players.map((p) => ({
+      seat: p.seat,
+      team: p.team,
+      name: p.name,
+      isCiftci: p.isCiftci,
+      hasOpened: playerHasOpened(p, state),
+      penalty: playerFinishHandPenalty(
+        p,
+        state,
+        finish,
+        p.team === loserTeam
+      ),
+    }));
 
     const breakdown: [TeamHandBreakdown, TeamHandBreakdown] = [
       {
@@ -252,6 +266,7 @@ export function scoreHand(
       rawTotals,
       breakdown,
       finishInfo: finish,
+      playerPenalties,
     };
   }
 

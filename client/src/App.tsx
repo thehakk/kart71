@@ -180,6 +180,7 @@ export default function App() {
           {error && <p className="error">{error}</p>}
         </div>
       )}
+      <footer className="app-credit">by hakkı</footer>
     </div>
   );
 }
