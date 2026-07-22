@@ -160,7 +160,9 @@ export function HandResult({ game }: { game: GameView }) {
           <button
             className={`primary ${game.handContinue?.yourReady ? 'ready' : ''}`}
             onClick={() =>
-              socket.emit('room:ready', { ready: !game.handContinue?.yourReady })
+              game.handContinue?.yourReady
+                ? socket.emit('room:ready', { ready: false })
+                : socket.emit('room:ready', { ready: true })
             }
           >
             {game.handContinue?.yourReady

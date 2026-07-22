@@ -110,6 +110,7 @@ function onHandJustEnded(code: string) {
   if (!room) return;
   room.resetHandContinueReady();
   broadcastRoom(code);
+  broadcastGame(code);
 }
 
 // 4 oyuncu (bot dahil) hazirsa oyunu baslat.
@@ -170,11 +171,10 @@ function botTick(code: string) {
     try {
       const result = runBotTurn(g, g.turnSeat);
       if (result === 'noop') return;
-      broadcastGame(code);
-      const phaseAfter = g.phase as GamePhase;
-      if (phaseAfter === 'ended') {
+      if (result === 'handEnded') {
         onHandJustEnded(code);
-      } else if (result !== 'handEnded') {
+      } else {
+        broadcastGame(code);
         scheduleBots(code);
       }
     } catch {
@@ -295,11 +295,13 @@ io.on('connection', (socket) => {
     try {
       const wasEnded = room.game.phase === 'ended';
       fn(room.game, seat);
-      broadcastGame(code);
       if (room.game.phase === 'ended' && !wasEnded) {
         onHandJustEnded(code);
-      } else if (room.game.phase !== 'ended') {
-        scheduleBots(code);
+      } else {
+        broadcastGame(code);
+        if (room.game.phase !== 'ended') {
+          scheduleBots(code);
+        }
       }
     } catch (e) {
       if (e instanceof ActionError) socket.emit('error', { message: e.message });
@@ -437,11 +439,13 @@ io.on('connection', (socket) => {
     try {
       const wasEnded = room.game.phase === 'ended';
       respondDiscard(room.game, seat, give);
-      broadcastGame(code);
       if (room.game.phase === 'ended' && !wasEnded) {
         onHandJustEnded(code);
-      } else if (room.game.phase !== 'ended') {
-        scheduleBots(code);
+      } else {
+        broadcastGame(code);
+        if (room.game.phase !== 'ended') {
+          scheduleBots(code);
+        }
       }
     } catch (e) {
       if (e instanceof ActionError) socket.emit('error', { message: e.message });
