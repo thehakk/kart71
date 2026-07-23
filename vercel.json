@@ -7,5 +7,5 @@
   "env": {
     "VITE_SERVER_URL": "https://kart71-server.onrender.com"
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [{ "source": "/((?!ads\\.txt|favicon\\.svg).*)", "destination": "/index.html" }]
 }

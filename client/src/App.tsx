@@ -4,7 +4,12 @@ import type { GameView, RoomView, Seat } from './types';
 import { Table } from './components/Table';
 import { GameTable } from './components/GameTable';
 import { GameOver } from './components/GameOver';
+import { Logo } from './components/Logo';
+import { AdSlot } from './components/AdSlot';
 import { clearSession, loadSession, saveSession } from './lib/session';
+import { ensureAdSenseScript, isAdSenseEnabled } from './lib/adsense';
+
+const LOBBY_AD_SLOT = import.meta.env.VITE_ADSENSE_SLOT_LOBBY?.trim();
 
 const MAX_JOIN_RETRIES = 6;
 
@@ -109,6 +114,10 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (isAdSenseEnabled()) ensureAdSenseScript();
+  }, []);
+
   const mySeat: Seat | null = room?.yourSeat ?? null;
   const me = room && mySeat != null ? room.players[mySeat] : null;
 
@@ -124,7 +133,9 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>71</h1>
+        <div className="topbar-brand">
+          <Logo size={40} />
+        </div>
         <span className={`conn ${connected ? 'on' : 'off'}`}>
           {reconnecting ? 'Yeniden bağlanılıyor…' : connected ? 'Bağlandı' : 'Bağlantı yok'}
         </span>
@@ -135,7 +146,9 @@ export default function App() {
       )}
 
       {!room && !reconnecting && (
-        <div className="lobby-card">
+        <>
+          <AdSlot slot={LOBBY_AD_SLOT} format="horizontal" className="ad-lobby" />
+          <div className="lobby-card">
           <h2>Odaya Katıl</h2>
           <input placeholder="Adın" value={name} onChange={(e) => setName(e.target.value)} />
           <input
@@ -147,7 +160,8 @@ export default function App() {
             Katıl
           </button>
           {error && <p className="error">{error}</p>}
-        </div>
+          </div>
+        </>
       )}
 
       {room && game && room.status === 'in_game' && <GameTable game={game} />}
@@ -158,6 +172,7 @@ export default function App() {
 
       {room && room.status !== 'in_game' && room.status !== 'finished' && (
         <div className="room">
+          <AdSlot slot={LOBBY_AD_SLOT} format="horizontal" className="ad-lobby" />
           <div className="room-head">
             <span>
               Oda kodu: <strong>{room.code}</strong>{' '}

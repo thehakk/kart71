@@ -46,6 +46,52 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.brand-logo-icon {
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+}
+
+.brand-logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.ad-slot {
+  margin: 12px auto 0;
+  max-width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.ad-slot.ad-lobby {
+  max-width: 728px;
+  min-height: 90px;
+}
+
+.ad-slot.ad-result {
+  margin-top: 16px;
+  min-height: 250px;
 }
 
 .topbar h1 {

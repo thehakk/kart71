@@ -1,6 +1,9 @@
 import type { GameFinalResult } from '../types';
 import { Scoreboard } from './Scoreboard';
+import { AdSlot } from './AdSlot';
 import { socket } from '../socket';
+
+const RESULT_AD_SLOT = import.meta.env.VITE_ADSENSE_SLOT_LOBBY?.trim();
 
 export function GameOver({ result }: { result: GameFinalResult }) {
   const winner =
@@ -30,6 +33,7 @@ export function GameOver({ result }: { result: GameFinalResult }) {
         <button className="primary" onClick={() => socket.emit('room:playAgain')}>
           Lobiye dön — yeni oyun
         </button>
+        <AdSlot slot={RESULT_AD_SLOT} format="rectangle" className="ad-result" />
       </div>
     </div>
   );
