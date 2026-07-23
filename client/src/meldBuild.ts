@@ -18,7 +18,7 @@ export function rankPoints(rank: Rank): number {
 // Basarisizsa null.
 export function buildRunOrder(cards: Card[]): Card[] | null {
   const reals = cards.filter((c) => !c.isJoker);
-  const jokerList = cards.filter((c) => c.isJoker);
+  const jokerList = cards.filter((c) => c.isJoker).sort((a, b) => a.id.localeCompare(b.id));
   let jokers = jokerList.length;
   if (reals.length === 0) return null;
 

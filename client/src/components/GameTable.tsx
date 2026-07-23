@@ -15,7 +15,7 @@ import { detectAndBuildMeld, type BuiltMeld } from '../meldBuild';
 import { planFinishForHand, type FinishPlan } from '../finishPlan';
 import { CardBack, CardView } from './CardView';
 import { MeldsArea } from './MeldsArea';
-import { HandGrid, HAND_MIN_COLS, HAND_ROWS, insertCardIntoGrid, resolveHandDropSlot } from './HandCards';
+import { HandGrid, HAND_MIN_COLS, HAND_ROWS, findBottomRightEmptySlot, insertCardIntoGrid, resolveHandDropSlot, sortCardsByGridOrder } from './HandCards';
 import { HandResult } from './HandResult';
 import { EndHandsPanel } from './EndHandsPanel';
 import { Scoreboard } from './Scoreboard';
@@ -99,6 +99,7 @@ export function GameTable({ game }: { game: GameView }) {
   const [gridCols, setGridCols] = useState(HAND_MIN_COLS);
   const [gridSlots, setGridSlots] = useState<(string | null)[]>([]);
   const [pendingDrawId, setPendingDrawId] = useState<string | null>(null);
+  const pendingDrawIdRef = useRef<string | null>(null);
   const prevHandIdsRef = useRef<string[]>([]);
   const handNumberRef = useRef(game.handNumber);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -223,7 +224,9 @@ export function GameTable({ game }: { game: GameView }) {
     if (newcomers.length > 0) {
       const names = newcomers.map((p) => p.name).join(', ');
       setToast(
-        newcomers.length === 1 ? `${names} çiftçi oldu.` : `${names} çiftçi oldu.`
+        newcomers.length === 1
+          ? `${names} çifte gitti — yalnızca çift açabilir / çiftten bitebilir.`
+          : `${names} çifte gitti.`
       );
       window.clearTimeout((setToast as unknown as { _t?: number })._t);
       (setToast as unknown as { _t?: number })._t = window.setTimeout(
@@ -309,8 +312,13 @@ export function GameTable({ game }: { game: GameView }) {
     setGridCols(cols);
     setGridSlots(slots);
     setPendingDrawId(null);
+    pendingDrawIdRef.current = null;
     prevHandIdsRef.current = handIds;
   };
+
+  useEffect(() => {
+    pendingDrawIdRef.current = pendingDrawId;
+  }, [pendingDrawId]);
 
   useEffect(() => {
     handNumberRef.current = game.handNumber;
@@ -333,6 +341,21 @@ export function GameTable({ game }: { game: GameView }) {
     const removed = new Set(prev.filter((id) => !curr.includes(id)));
 
     if (added.length === 1 && myTurn && game.phase === 'discard') {
+      const prevPending = pendingDrawIdRef.current;
+      if (prevPending && curr.includes(prevPending)) {
+        setGridSlots((slots) => {
+          const colsNow = Math.max(HAND_MIN_COLS, Math.ceil(slots.length / HAND_ROWS));
+          let slot = findBottomRightEmptySlot(slots, colsNow);
+          let working = slots;
+          if (slot >= working.length) {
+            working = [...working, ...Array(HAND_ROWS).fill(null)];
+            setGridCols((c) => c + 1);
+          }
+          const { slots: next, cols } = insertCardIntoGrid(working, prevPending, slot);
+          setGridCols((c) => Math.max(c, cols, HAND_MIN_COLS));
+          return next;
+        });
+      }
       setPendingDrawId(added[0]);
     }
 
@@ -340,7 +363,6 @@ export function GameTable({ game }: { game: GameView }) {
       setGridSlots((slots) => {
         let next = slots.map((id) => (id && !removed.has(id) ? id : null));
         const placed = new Set(next.filter(Boolean) as string[]);
-        if (pendingDrawId && curr.includes(pendingDrawId)) placed.add(pendingDrawId);
         for (const id of added) {
           if (placed.has(id)) continue;
           if (id === added[0] && added.length === 1 && myTurn && game.phase === 'discard') {
@@ -360,7 +382,7 @@ export function GameTable({ game }: { game: GameView }) {
     }
 
     prevHandIdsRef.current = curr;
-  }, [game.yourHand, game.phase, myTurn, gridSlots.length, pendingDrawId]);
+  }, [game.yourHand, game.phase, myTurn]);
 
   const moveCardToSlot = (cardId: string, slotIndex: number) => {
     setGridSlots((prev) => {
@@ -403,6 +425,10 @@ export function GameTable({ game }: { game: GameView }) {
         prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id]
       );
     } else if (jokerMode) {
+      if (c.isJoker || isPairWildClient(c, game.taban)) {
+        setLocalMsg('Joker yerine gerçek kağıt seç.');
+        return;
+      }
       setJokerCardId((prev) => (prev === c.id ? null : c.id));
     } else if (finishMode) {
       if (finishManualMode) {
@@ -421,7 +447,10 @@ export function GameTable({ game }: { game: GameView }) {
 
   const addMeld = () => {
     setLocalMsg(null);
-    const cards = currentSel.map(cardById).filter(Boolean) as Card[];
+    const cards = sortCardsByGridOrder(
+      currentSel.map(cardById).filter(Boolean) as Card[],
+      gridSlots
+    ) as Card[];
     const res = detectAndBuildMeld(cards);
     if ('error' in res) {
       setLocalMsg(res.error);
@@ -707,7 +736,10 @@ export function GameTable({ game }: { game: GameView }) {
 
   const addFinishMeld = () => {
     setLocalMsg(null);
-    const cards = finishCurrentSel.map(cardById).filter(Boolean) as Card[];
+    const cards = sortCardsByGridOrder(
+      finishCurrentSel.map(cardById).filter(Boolean) as Card[],
+      gridSlots
+    ) as Card[];
     const res = detectAndBuildMeld(cards);
     if ('error' in res) {
       setLocalMsg(res.error);
@@ -913,8 +945,8 @@ export function GameTable({ game }: { game: GameView }) {
                     );
                   })()}
                   {p.isCiftci && (
-                    <span className="tag ciftci">
-                      <span className="tag-long">çiftçi</span>
+                    <span className="tag ciftci" title="Çifte gitti — yalnızca çift açar / çiftten biter">
+                      <span className="tag-long">çifte gitti</span>
                       <span className="tag-short">Çf</span>
                     </span>
                   )}
@@ -1095,17 +1127,25 @@ export function GameTable({ game }: { game: GameView }) {
           </div>
         )}
 
+        {meInfo.isCiftci && myTurn && !handEnded && (
+          <div className="ciftci-banner">
+            <strong>Çifte gittin</strong> — yalnızca çift açabilir, çiftten bitebilirsin; per işleyemezsin.
+            Atıkları sormadan alırsın (taban/joker hariç).
+          </div>
+        )}
+
         {/* Ciftce git deklarasyonu */}
         {canDeclareCift && (
           <div className="take-bar">
             <button
-              className="chip warn"
+              type="button"
+              className="chip warn ciftci-declare"
               onClick={() => socket.emit('turn:declareCiftci')}
             >
-              Çifte git (deklare)
+              Çifte git
             </button>
             <span className="muted">
-              Atık almadan çiftçi ol — yalnızca çift açabilirsin
+              Atık almadan çifte git — sonrasında yalnızca çift açabilir / çiftten bitebilirsin
             </span>
           </div>
         )}
@@ -1124,8 +1164,13 @@ export function GameTable({ game }: { game: GameView }) {
               </button>
             )}
             <button type="button" className="chip warn" onClick={() => takeDiscard(false)}>
-              Sormadan al (çiftçi ol)
+              Sormadan al (çifte git)
             </button>
+            {game.takeBlocked && (
+              <span className="muted take-blocked-hint">
+                Sorarak alınamadı — <strong>sormadan al</strong> ile çifte gidip kağıdı alabilirsin.
+              </span>
+            )}
             {deckEmpty && game.discardTop && (
               <span className="muted">Deste bitti — son atık sorulamaz ve alınamaz.</span>
             )}

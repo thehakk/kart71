@@ -131,6 +131,7 @@ export interface GameView {
   discardsMade: number;
   discardAskable?: boolean;
   discardTakeable?: boolean;
+  takeBlocked?: boolean;
   visibleDiscards: Card[] | null;
   bothTeamsCiftci: boolean;
   taban: Card;

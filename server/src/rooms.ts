@@ -232,22 +232,33 @@ export class Room {
     return null;
   }
 
-  /** Ayni isimle oyun/lobi devam ederken yeniden baglan. */
-  reconnectPlayer(name: string, socketId: string): Seat | null {
+  /** Ayni isimle oyun/lobi devam ederken yeniden baglan (sayfa yenileme dahil). */
+  reconnectPlayer(
+    name: string,
+    socketId: string,
+    kickSocket?: (oldSocketId: string) => void
+  ): Seat | null {
     const trimmed = name.trim() || 'Oyuncu';
     for (let i = 0; i < 4; i++) {
       const s = this.slots[i];
-      if (s && !s.isBot && !s.connected && s.name === trimmed) {
-        s.connected = true;
-        s.socketId = socketId;
-        if (this.game) {
-          const p = this.game.players[i as Seat];
-          if (p) p.connected = true;
-        }
-        return i as Seat;
+      if (!s || s.isBot || s.name !== trimmed) continue;
+      if (s.socketId && s.socketId !== socketId && kickSocket) {
+        kickSocket(s.socketId);
       }
+      s.connected = true;
+      s.socketId = socketId;
+      if (this.game) {
+        const p = this.game.players[i as Seat];
+        if (p) p.connected = true;
+      }
+      return i as Seat;
     }
     return null;
+  }
+
+  hasHumanNamed(name: string): boolean {
+    const trimmed = name.trim() || 'Oyuncu';
+    return this.slots.some((s) => s && !s.isBot && s.name === trimmed);
   }
 
   isEmpty(): boolean {

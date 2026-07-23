@@ -71,6 +71,11 @@ const io = new Server<
 
 const rooms = new RoomManager();
 
+function kickSocket(oldSocketId: string): void {
+  const old = io.sockets.sockets.get(oldSocketId);
+  if (old) old.disconnect(true);
+}
+
 function broadcastRoom(code: string) {
   const room = rooms.get(code);
   if (!room) return;
@@ -91,10 +96,12 @@ function broadcastGame(code: string) {
     if (sock.data.code === code) {
       const seat = room.seatOfSocket(sock.id);
       if (seat != null) {
+        const g = room.game;
         const view = {
-          ...toGameView(room.game, seat),
-          discardAskable: canAskForDiscard(room.game, seat),
-          discardTakeable: canTakeTopDiscard(room.game, seat),
+          ...toGameView(g, seat),
+          discardAskable: canAskForDiscard(g, seat),
+          discardTakeable: canTakeTopDiscard(g, seat),
+          takeBlocked: g.takeBlocked && g.turnSeat === seat && g.phase === 'draw',
           ...(room.game.phase === 'ended'
             ? { handContinue: room.handContinueView(seat) }
             : {}),
@@ -191,7 +198,7 @@ io.on('connection', (socket) => {
     const room = rooms.getOrCreate(code);
 
     if (room.status !== 'lobby') {
-      const seat = room.reconnectPlayer(trimmedName, socket.id);
+      const seat = room.reconnectPlayer(trimmedName, socket.id, kickSocket);
       if (seat === null) {
         ack?.({
           ok: false,
@@ -208,13 +215,19 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const reconnected = room.reconnectPlayer(trimmedName, socket.id);
+    const reconnected = room.reconnectPlayer(trimmedName, socket.id, kickSocket);
     if (reconnected != null) {
       socket.data.code = room.code;
       socket.data.seat = reconnected;
       socket.join(room.code);
       ack?.({ ok: true, code: room.code, seat: reconnected });
       broadcastRoom(room.code);
+      if (room.game) broadcastGame(room.code);
+      return;
+    }
+
+    if (room.hasHumanNamed(trimmedName)) {
+      ack?.({ ok: false, error: 'Koltuk hazırlanıyor, tekrar deneyin.' });
       return;
     }
 

@@ -18,6 +18,38 @@ export const HAND_ROWS = 3;
 export const HAND_MIN_COLS = 5;
 export const HAND_SLOT_PREFIX = 'hand-slot-';
 
+/** Sutun-satir gridinde sag-alt bos slot (yoksa yeni sutunun alti). */
+export function findBottomRightEmptySlot(
+  slots: (string | null)[],
+  cols: number,
+  rows = HAND_ROWS
+): number {
+  for (let c = cols - 1; c >= 0; c--) {
+    for (let r = rows - 1; r >= 0; r--) {
+      const idx = c * rows + r;
+      if (idx < slots.length && slots[idx] === null) return idx;
+    }
+  }
+  return cols * rows;
+}
+
+/** Grid konumuna gore kart sirala (secim sirasindan bagimsiz). */
+export function sortCardsByGridOrder(
+  cards: { id: string }[],
+  gridSlots: (string | null)[]
+): { id: string }[] {
+  const order = new Map<string, number>();
+  gridSlots.forEach((id, i) => {
+    if (id) order.set(id, i);
+  });
+  return [...cards].sort((a, b) => {
+    const oa = order.get(a.id) ?? 9999;
+    const ob = order.get(b.id) ?? 9999;
+    if (oa !== ob) return oa - ob;
+    return a.id.localeCompare(b.id);
+  });
+}
+
 /** Hedef slota kart koy; doluysa alttakini ayni satirda saga kaydir. */
 export function insertCardIntoGrid(
   slots: (string | null)[],

@@ -99,7 +99,6 @@ function deckEmptyBlocksDiscardTake(state: GameState): boolean {
 }
 
 export function canTakeTopDiscard(state: GameState, seat: Seat): boolean {
-  if (state.takeBlocked) return false;
   const top = state.discardPile[state.discardPile.length - 1];
   if (!top) return false;
   const player = state.players[seat];
@@ -126,7 +125,8 @@ export function takeDiscard(state: GameState, seat: Seat, ask: boolean): void {
   requireTurn(state, seat);
   if (state.pending) throw new ActionError('Bekleyen bir istek var.');
   if (state.phase !== 'draw') throw new ActionError('Şu an çekme/alma sırası değil.');
-  if (state.takeBlocked) throw new ActionError('Bu atığı bu tur alamazsın, desteden çek.');
+  if (state.takeBlocked && ask)
+    throw new ActionError('Bu atığı sorarak alamazsın; sormadan al (çiftçi ol) veya desteden çek.');
   const top = state.discardPile[state.discardPile.length - 1];
   if (!top) throw new ActionError('Atıkta kağıt yok.');
   const player = state.players[seat];
@@ -185,6 +185,7 @@ export function takeDiscard(state: GameState, seat: Seat, ask: boolean): void {
     player.hand.push(top);
     player.emptiedDeckThisTurn = false;
     markCiftci(state, seat);
+    state.takeBlocked = false;
     state.phase = 'discard';
   }
 }

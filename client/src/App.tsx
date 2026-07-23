@@ -6,6 +6,8 @@ import { GameTable } from './components/GameTable';
 import { GameOver } from './components/GameOver';
 import { clearSession, loadSession, saveSession } from './lib/session';
 
+const MAX_JOIN_RETRIES = 6;
+
 export default function App() {
   const [connected, setConnected] = useState(socket.connected);
   const [reconnecting, setReconnecting] = useState(false);
@@ -15,9 +17,12 @@ export default function App() {
   const [game, setGame] = useState<GameView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hadRoomRef = useRef(false);
-  const joinRef = useRef<(n: string, c?: string) => void>(() => {});
+  const joinInFlightRef = useRef(false);
+  const joinRef = useRef<(n: string, c?: string, attempt?: number) => void>(() => {});
 
-  const join = useCallback((joinName: string, joinCode?: string) => {
+  const join = useCallback((joinName: string, joinCode?: string, attempt = 0) => {
+    if (joinInFlightRef.current) return;
+    joinInFlightRef.current = true;
     setError(null);
     const trimmedName = joinName.trim() || 'Oyuncu';
     const trimmedCode = joinCode?.trim().toUpperCase();
@@ -25,7 +30,23 @@ export default function App() {
       'room:join',
       { name: trimmedName, code: trimmedCode || undefined },
       (res) => {
+        joinInFlightRef.current = false;
         if (!res.ok) {
+          const session = loadSession();
+          const retryable =
+            session &&
+            attempt < MAX_JOIN_RETRIES &&
+            (res.error.includes('tekrar deneyin') ||
+              res.error.includes('bağlı koltuk bulunamadı') ||
+              res.error.includes('Oda dolu'));
+          if (retryable) {
+            setReconnecting(true);
+            window.setTimeout(
+              () => joinRef.current(session.name, session.code, attempt + 1),
+              400 * (attempt + 1)
+            );
+            return;
+          }
           setError(res.error);
           setReconnecting(false);
           return;
@@ -41,7 +62,9 @@ export default function App() {
   joinRef.current = join;
 
   useEffect(() => {
+    let mounted = true;
     const onConnect = () => {
+      if (!mounted) return;
       setConnected(true);
       const session = loadSession();
       if (session) {
@@ -50,6 +73,7 @@ export default function App() {
       }
     };
     const onDisconnect = () => {
+      if (!mounted) return;
       setConnected(false);
       if (hadRoomRef.current) setReconnecting(true);
     };
@@ -76,6 +100,7 @@ export default function App() {
     }
 
     return () => {
+      mounted = false;
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('room:update', onRoomUpdate);

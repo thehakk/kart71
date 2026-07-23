@@ -507,6 +507,36 @@ button.link {
 
 .tag.ciftci {
   background: #7c3aed;
+  color: #f5f3ff;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(196, 181, 253, 0.45);
+}
+
+.ciftci-banner {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(124, 58, 237, 0.18);
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  color: #ede9fe;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ciftci-banner strong {
+  color: #ddd6fe;
+}
+
+.chip.ciftci-declare {
+  font-weight: 600;
+}
+
+.take-blocked-hint {
+  color: #fcd34d;
+}
+
+.take-blocked-hint strong {
+  color: #fde68a;
 }
 .tag.disconnected {
   background: rgba(239, 68, 68, 0.35);

@@ -148,6 +148,7 @@ export interface GameView {
   discardsMade: number; // 0 = henuz ilk atim yok (acilis karti alinabilir)
   discardAskable?: boolean; // islek/joker/taban haric sorarak alinabilir
   discardTakeable?: boolean; // islek/joker/taban/deste-bitti haric atik alinabilir
+  takeBlocked?: boolean; // reddedilen atik sorarak alinamaz; sormadan alinabilir
   visibleDiscards: Card[] | null; // ciftci gorunurlugu: izinliyse tum atiklar
   bothTeamsCiftci: boolean; // iki takimda da ciftci varsa herkes gorur
   taban: Card; // yere acilan gosterge; cekilemez
