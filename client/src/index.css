@@ -64,7 +64,16 @@ body {
 
 .brand-logo-icon {
   flex-shrink: 0;
-  filter: drop-shadow(0 3px 8px rgba(251, 191, 36, 0.25));
+}
+
+.brand-logo-joker {
+  display: block;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 8px;
+  border: 2px solid rgba(250, 204, 21, 0.45);
+  background: #f5f0e6;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
 }
 
 .brand-logo-text {
