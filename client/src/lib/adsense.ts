@@ -19,7 +19,7 @@ let scriptRequested = false;
 export function ensureAdSenseScript(): void {
   const client = getAdSenseClient();
   if (!client || typeof document === 'undefined') return;
-  if (scriptRequested || document.querySelector('script[data-kart71-adsense]')) return;
+  if (scriptRequested || document.querySelector('script[src*="adsbygoogle.js"]')) return;
   scriptRequested = true;
 
   const script = document.createElement('script');

@@ -5,7 +5,8 @@
   "outputDirectory": "client/dist",
   "framework": "vite",
   "env": {
-    "VITE_SERVER_URL": "https://kart71-server.onrender.com"
+    "VITE_SERVER_URL": "https://kart71-server.onrender.com",
+    "VITE_ADSENSE_CLIENT": "ca-pub-7173185304556215"
   },
   "rewrites": [{ "source": "/((?!ads\\.txt|favicon\\.svg).*)", "destination": "/index.html" }]
 }
