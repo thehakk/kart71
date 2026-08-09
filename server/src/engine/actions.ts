@@ -472,7 +472,7 @@ function cardMatchesMeldJoker(meld: Meld, card: Card): boolean {
       const resolved = resolveJokerInRun(meld.cards, i);
       if (resolved && resolved.suit === card.suit && resolved.rank === card.rank) return true;
     } else {
-      const resolved = resolveJokerInGroup(meld.cards);
+      const resolved = resolveJokerInGroup(meld.cards, i);
       if (resolved && resolved.suit === card.suit && resolved.rank === card.rank) return true;
     }
   }
@@ -879,8 +879,6 @@ export function swapJokerInMeld(
 
   const meld = state.melds.find((m) => m.id === meldId);
   if (!meld) throw new ActionError('Per bulunamadı.');
-  const jIdx = meld.cards.findIndex((c) => c.isJoker);
-  if (jIdx === -1) throw new ActionError('Bu perde joker yok.');
   if (!canSwapJokerOnMeld(state, seat, meld))
     throw new ActionError('Bu perdeki jokeri alamazsın.');
 
@@ -889,13 +887,19 @@ export function swapJokerInMeld(
   const card = player.hand[handIdx];
   if (card.isJoker) throw new ActionError('Joker ile joker değiştirilemez.');
 
-  const expected =
-    meld.type === 'run'
-      ? resolveJokerInRun(meld.cards, jIdx)
-      : resolveJokerInGroup(meld.cards);
-  if (!expected) throw new ActionError('Joker çözümlenemedi.');
-  if (card.suit !== expected.suit || card.rank !== expected.rank)
-    throw new ActionError('Bu kağıt jokerin yerine geçemez.');
+  let jIdx = -1;
+  for (let i = 0; i < meld.cards.length; i++) {
+    if (!meld.cards[i].isJoker) continue;
+    const expected =
+      meld.type === 'run'
+        ? resolveJokerInRun(meld.cards, i)
+        : resolveJokerInGroup(meld.cards, i);
+    if (expected && card.suit === expected.suit && card.rank === expected.rank) {
+      jIdx = i;
+      break;
+    }
+  }
+  if (jIdx === -1) throw new ActionError('Bu kağıt jokerin yerine geçemez.');
 
   const joker = meld.cards[jIdx];
   meld.cards[jIdx] = card;

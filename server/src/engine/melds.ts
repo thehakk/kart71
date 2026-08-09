@@ -88,7 +88,7 @@ export function validateMeld(type: MeldType, cards: Card[]): MeldResult {
 /** Sirali per kagitlarini soldan saga diz (joker araligi doldurur). */
 export function buildRunOrder(cards: Card[]): Card[] | null {
   const reals = cards.filter((c) => !c.isJoker);
-  const jokerList = cards.filter((c) => c.isJoker);
+  const jokerList = cards.filter((c) => c.isJoker).sort((a, b) => a.id.localeCompare(b.id));
   let jokers = jokerList.length;
   if (reals.length === 0) return null;
 
@@ -220,15 +220,31 @@ export function resolveJokerInRun(
 }
 
 // Erkek perde jokerin temsil ettigi kart (eksik seri).
-export function resolveJokerInGroup(cards: Card[]): { suit: Suit; rank: Rank } | null {
+export function resolveJokerInGroup(
+  cards: Card[],
+  jokerIdx?: number
+): { suit: Suit; rank: Rank } | null {
   const reals = cards.filter((c) => !c.isJoker);
   if (reals.length === 0) return null;
   const rank = reals[0].rank as Rank;
   const usedSuits = new Set(reals.map((c) => c.suit).filter(Boolean));
   const allSuits: Suit[] = ['H', 'D', 'C', 'S'];
-  const missing = allSuits.find((s) => !usedSuits.has(s));
-  if (!missing) return null;
-  return { suit: missing, rank };
+  const missing = allSuits.filter((s) => !usedSuits.has(s));
+
+  if (jokerIdx === undefined) {
+    return missing[0] ? { suit: missing[0], rank } : null;
+  }
+
+  if (!cards[jokerIdx]?.isJoker) return null;
+  let jokerOrder = 0;
+  for (let i = 0; i < cards.length; i++) {
+    if (!cards[i].isJoker) continue;
+    if (i === jokerIdx) {
+      return missing[jokerOrder] ? { suit: missing[jokerOrder], rank } : null;
+    }
+    jokerOrder++;
+  }
+  return null;
 }
 
 // Ciftte wild (joker/taban) yerine gecmesi gereken birebir kart.

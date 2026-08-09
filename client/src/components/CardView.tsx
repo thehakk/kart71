@@ -36,10 +36,12 @@ export function CardView({
     .join(' ');
 
   if (card.isJoker) {
+    const jokerName = card.back === 'red' ? 'Kırmızı joker' : 'Mavi joker';
+    const jokerShort = card.back === 'red' ? 'K-JOKER' : 'M-JOKER';
     return (
-      <div className={`${cls} joker`} onClick={onClick} title={`Joker (${card.back})`}>
+      <div className={`${cls} joker joker-${card.back}`} onClick={onClick} title={jokerName}>
         <span className="joker-star">&#9733;</span>
-        <span className="joker-label">JOKER</span>
+        <span className="joker-label">{jokerShort}</span>
       </div>
     );
   }

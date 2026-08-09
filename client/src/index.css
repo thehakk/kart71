@@ -437,12 +437,23 @@ button.link {
   background: linear-gradient(135deg, #fde68a, #fca5a5);
   color: #7c2d12;
 }
+.card.joker.joker-red {
+  background: linear-gradient(135deg, #fecaca, #fde68a);
+  border-color: #dc2626;
+}
+.card.joker.joker-blue {
+  background: linear-gradient(135deg, #bfdbfe, #fde68a);
+  border-color: #2563eb;
+}
 .joker-star {
   font-size: 18px;
 }
 .joker-label {
-  font-size: 8px;
-  letter-spacing: 1px;
+  font-size: 7px;
+  letter-spacing: 0.5px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.1;
 }
 
 .card-facedown {

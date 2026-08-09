@@ -20,7 +20,7 @@ function suitOrd(c: Card): number {
 function sortPer(cards: Card[]): Card[] {
   return [...cards].sort((a, b) => {
     if (a.isJoker !== b.isJoker) return a.isJoker ? 1 : -1;
-    if (a.isJoker && b.isJoker) return 0;
+    if (a.isJoker && b.isJoker) return a.id.localeCompare(b.id);
     if (suitOrd(a) !== suitOrd(b)) return suitOrd(a) - suitOrd(b);
     return seq(a) - seq(b);
   });
@@ -30,7 +30,7 @@ function sortPer(cards: Card[]): Card[] {
 function sortCift(cards: Card[]): Card[] {
   return [...cards].sort((a, b) => {
     if (a.isJoker !== b.isJoker) return a.isJoker ? 1 : -1;
-    if (a.isJoker && b.isJoker) return 0;
+    if (a.isJoker && b.isJoker) return a.id.localeCompare(b.id);
     if (seq(a) !== seq(b)) return seq(a) - seq(b);
     if (suitOrd(a) !== suitOrd(b)) return suitOrd(a) - suitOrd(b);
     // ayni kart: kirmizi sirt once
