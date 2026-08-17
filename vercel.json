@@ -8,5 +8,14 @@
     "VITE_SERVER_URL": "https://kart71-server.onrender.com",
     "VITE_ADSENSE_CLIENT": "ca-pub-7173185304556215"
   },
-  "rewrites": [{ "source": "/((?!ads\\.txt|favicon\\.svg|jolly-joker\\.png).*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/nasil-oynanir", "destination": "/nasil-oynanir.html" },
+    { "source": "/gizlilik", "destination": "/gizlilik.html" },
+    { "source": "/hakkinda", "destination": "/hakkinda.html" },
+    { "source": "/iletisim", "destination": "/iletisim.html" },
+    {
+      "source": "/((?!ads\\.txt|robots\\.txt|sitemap\\.xml|site\\.css|favicon\\.svg|jolly-joker\\.png|nasil-oynanir\\.html|gizlilik\\.html|hakkinda\\.html|iletisim\\.html).*)",
+      "destination": "/index.html"
+    }
+  ]
 }

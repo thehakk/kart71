@@ -90,7 +90,6 @@ body {
   min-height: 0;
   overflow: hidden;
   border-radius: 8px;
-  background: rgba(15, 23, 42, 0.5);
 }
 
 .ad-slot.ad-lobby {
@@ -1548,4 +1547,266 @@ button.primary {
 .game-over-card .primary {
   margin-top: 16px;
   width: 100%;
+}
+
+/* ---- Site sayfalari (AdSense icerik) ---- */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.app-site {
+  max-width: 760px;
+}
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 8px;
+}
+
+.site-brand {
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  flex: 1 1 auto;
+}
+
+.site-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.site-nav a:hover,
+.site-nav a.active {
+  color: var(--accent);
+}
+
+.site-footer {
+  margin-top: 40px;
+  padding: 20px 0 12px;
+  border-top: 1px solid #334155;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.site-footer-brand {
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+.site-footer-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-bottom: 10px;
+}
+
+.site-footer-nav a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.site-footer-nav a:hover {
+  text-decoration: underline;
+}
+
+.site-footer-copy {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.prose {
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.prose h1 {
+  font-size: clamp(26px, 5vw, 34px);
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  margin: 0 0 14px;
+}
+
+.prose h2 {
+  font-size: 22px;
+  margin: 28px 0 10px;
+}
+
+.prose h3 {
+  font-size: 17px;
+  margin: 20px 0 8px;
+}
+
+.prose p,
+.prose li,
+.prose dd {
+  color: #cbd5e1;
+}
+
+.prose a {
+  color: var(--accent);
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.2em;
+}
+
+.prose li + li {
+  margin-top: 6px;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 18px;
+  font-size: 14px;
+}
+
+.prose caption {
+  caption-side: bottom;
+  text-align: left;
+  color: var(--muted);
+  font-size: 12px;
+  padding-top: 6px;
+}
+
+.prose th,
+.prose td {
+  border-bottom: 1px solid #334155;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.prose th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.prose code {
+  font-size: 0.92em;
+  background: #0b1220;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.content-page {
+  padding-top: 12px;
+}
+
+.home-hero {
+  margin: 12px 0 8px;
+}
+
+.app-site .lobby-card {
+  margin: 12px auto 28px;
+}
+
+.lobby-card-lead {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.home-steps h2,
+.home-article h2 {
+  font-size: 22px;
+}
+
+.step-list {
+  margin: 0;
+  padding-left: 1.2em;
+  color: #cbd5e1;
+  line-height: 1.55;
+}
+
+.step-list li + li {
+  margin-top: 8px;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 28px 0;
+}
+
+.feature-card {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.feature-card h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.feature-card p {
+  margin: 0;
+  font-size: 14px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.faq-list {
+  margin: 0;
+}
+
+.faq-list dt {
+  margin-top: 14px;
+  font-weight: 700;
+}
+
+.faq-list dd {
+  margin: 6px 0 0;
+}
+
+.ad-slot.ad-content {
+  margin: 28px auto 8px;
+  max-width: 728px;
+}
+
+@media (max-width: 640px) {
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+  .site-header .conn {
+    margin-left: auto;
+  }
+  .app-site .lobby-card {
+    margin: 8px auto 20px;
+  }
 }

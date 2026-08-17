@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="google-adsense-account" content="ca-pub-7173185304556215" />
+    <meta
+      name="description"
+      content="Kart 71 nedir, kim geliştirdi, neden ücretsiz oynanır ve site nasıl çalışır?"
+    />
+    <link rel="canonical" href="https://kart71.vercel.app/hakkinda" />
+    <link rel="icon" type="image/png" href="/jolly-joker.png" />
+    <link rel="stylesheet" href="/site.css" />
+    <title>Hakkında — Kart 71</title>
+  </head>
+  <body>
+    <div class="app-site">
+      <header class="site-header">
+        <a class="site-brand" href="/">
+          <img src="/jolly-joker.png" alt="" width="40" height="40" />
+          Kart 71
+        </a>
+        <nav class="site-nav" aria-label="Site menüsü">
+          <a href="/">Oyna</a>
+          <a href="/nasil-oynanir">Nasıl oynanır</a>
+          <a href="/hakkinda" class="active">Hakkında</a>
+          <a href="/iletisim">İletişim</a>
+        </nav>
+      </header>
+      <main>
+        <article class="prose">
+          <p class="eyebrow">Kart 71</p>
+          <h1>Hakkında</h1>
+          <p>
+            Kart 71, tarayıcıda çalışan bağımsız bir iskambil oyunudur. Dört kişi, iki takım, 13
+            el. Sunucu oyunun kurallarını doğrular; istemci masayı gösterir. Amaç, arkadaşlarınla
+            aynı masaya oturup kayıt ekranına takılmadan oynamaktır.
+          </p>
+          <p>
+            Proje hakkı (Hakan Öztürk) tarafından geliştirilir. Ticari bir stüdyo ürünü değildir;
+            kural seti, masa akışı ve puanlama bu sitedeki oyuna özgüdür. 101 Okey ve benzeri
+            dökme oyunlarından tanıdık bir his vardır ama Kart 71 onların kopyası değildir.
+          </p>
+          <h2>Nasıl çalışır?</h2>
+          <p>
+            Oda ve oyun durumu bir Node.js sunucusundadır. Tarayıcı Socket.IO ile bağlanır. Kart
+            dağıtımı, yasal hamleler ve ceza hesabı sunucuda yapılır; rakibin elini görmezsin.
+            İstemci React ile yazılmıştır ve Vercel üzerinde yayınlanır.
+          </p>
+          <p>
+            Üyelik yoktur. Girdiğin isim ve oda kodu, sayfayı yenilediğinde aynı masaya dönebilmen
+            için tarayıcında tutulur. Ayrıntı <a href="/gizlilik">gizlilik politikasında</a>dır.
+          </p>
+          <h2>Neyi vaat eder, neyi etmez?</h2>
+          <ul>
+            <li>Ücretsiz oyna, oda kodu ile davet et, botlarla çalış.</li>
+            <li>Kurallar <a href="/nasil-oynanir">Nasıl oynanır</a> sayfasında yazılıdır.</li>
+            <li>Botlar alıştırma içindir. İleri düzey bir yapay zekâ veya sıralı lig yoktur.</li>
+            <li>Bahis, gerçek para veya ödül çarkı yoktur.</li>
+          </ul>
+          <h2>Reklam ve destek</h2>
+          <p>
+            Sitenin tanıtım ve kural sayfalarında Google AdSense reklamı bulunabilir. Reklam oyun
+            masasına, koltuk seçimine veya sonuç katmanına yerleştirilmez. Gelir, sunucu ve alan
+            adını ayakta tutmaya yardımcıdır; oyun içi satın alma yoktur.
+          </p>
+          <h2>Katkı ve iletişim</h2>
+          <p>
+            Hata, kural belirsizliği veya öneri için <a href="/iletisim">iletişim sayfasını</a>
+            kullan. Kaynak kod
+            <a href="https://github.com/thehakk/kart71" rel="noopener noreferrer">github.com/thehakk/kart71</a>
+            adresindedir.
+          </p>
+        </article>
+        <aside class="ad-slot" aria-label="Reklam">
+          <script
+            async
+            src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7173185304556215"
+            crossorigin="anonymous"
+          ></script>
+        </aside>
+      </main>
+      <footer class="site-footer">
+        <p><strong>Kart 71</strong> — tarayıcıda ücretsiz 2v2 iskambil oyunu.</p>
+        <nav class="site-footer-nav" aria-label="Alt menü">
+          <a href="/">Oyna</a>
+          <a href="/nasil-oynanir">Nasıl oynanır</a>
+          <a href="/hakkinda">Hakkında</a>
+          <a href="/gizlilik">Gizlilik</a>
+          <a href="/iletisim">İletişim</a>
+        </nav>
+        <p>© 2026 Kart 71 · by hakkı</p>
+      </footer>
+    </div>
+  </body>
+</html>

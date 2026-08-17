@@ -12,7 +12,8 @@ type AdSlotProps = {
 
 /**
  * AdSense reklam alani. VITE_ADSENSE_CLIENT ve slot tanimli degilse render etmez.
- * Oyun sirasinda kullanilmamali — lobi / el arasi ekranlar icin.
+ * Yalnizca yayinci icerigi olan sayfalarda kullan — oyun, lobi, uyari ve sonuc
+ * katmanlarinda cagirma.
  */
 export function AdSlot({
   slot,
