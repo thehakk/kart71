@@ -814,6 +814,47 @@ button.primary {
 .meld-cards {
   display: flex;
   gap: 2px;
+  align-items: center;
+}
+.meld-end {
+  min-width: 28px;
+  height: 36px;
+  padding: 0 4px;
+  border: 1px dashed var(--accent);
+  background: rgba(14, 165, 233, 0.18);
+  color: #e0f2fe;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.meld-end:hover:not(:disabled) {
+  background: rgba(14, 165, 233, 0.35);
+}
+.meld-end.disabled,
+.meld-end:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.card.joker.joker-as .joker-star {
+  font-size: 9px;
+  position: absolute;
+  top: 2px;
+  right: 3px;
+}
+.card.joker.joker-as {
+  position: relative;
+}
+.card-sm.joker.joker-as .joker-star {
+  font-size: 7px;
+  top: 1px;
+  right: 1px;
+}
+.card-sm.joker.joker-as .card-rank {
+  font-size: 9px;
+}
+.card-sm.joker.joker-as .card-suit {
+  font-size: 8px;
 }
 .meld-meta {
   font-size: 11px;

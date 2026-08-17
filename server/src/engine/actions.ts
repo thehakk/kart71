@@ -1,4 +1,4 @@
-import type { Card, Meld, MeldType, Seat } from '../shared/types.js';
+import type { Card, Meld, MeldType, RunEnd, Seat } from '../shared/types.js';
 import type { GameState } from './state.js';
 import {
   requiredOpenForGame,
@@ -9,8 +9,9 @@ import {
   anyoneOpened,
 } from './state.js';
 import { isEarlyDiscardPhase, nextTurnSeat, prevTurnSeat } from './turn.js';
-import { validateMeld, validatePair, resolveJokerInRun, resolveJokerInGroup, resolveWildInPair, findWildIndex, buildRunOrder, isTabanLikeCard, discardHelpsPairs, discardHelpsCiftciPairs } from './melds.js';
+import { validateMeld, validatePair, resolveJokerInRun, resolveJokerInGroup, resolveWildInPair, findWildIndex, buildRunOrder, isTabanLikeCard, discardHelpsPairs, discardHelpsCiftciPairs, addCardToMeld } from './melds.js';
 import { findFinishPlan } from './finishPlan.js';
+import { findProcessSequence } from './processPlan.js';
 import { applyHandScore, scoreHand, type FinishInfo } from './scoring.js';
 
 function markCiftci(state: GameState, seat: Seat): void {
@@ -444,23 +445,10 @@ export function openPairs(state: GameState, seat: Seat, pairIdGroups: string[][]
 
 function tryAddToMeld(
   meld: Meld,
-  card: Card
+  card: Card,
+  end?: RunEnd
 ): { cards: Card[]; points: number } | null {
-  if (meld.type === 'group') {
-    if (meld.cards.length >= 4) return null;
-    const combined = [...meld.cards, card];
-    const res = validateMeld('group', combined);
-    return res.ok ? { cards: combined, points: res.points } : null;
-  }
-  const base = buildRunOrder(meld.cards) ?? meld.cards;
-  if (base.length >= 5) return null;
-  const front = [card, ...base];
-  const rf = validateMeld('run', front);
-  if (rf.ok) return { cards: front, points: rf.points };
-  const back = [...base, card];
-  const rb = validateMeld('run', back);
-  if (rb.ok) return { cards: back, points: rb.points };
-  return null;
+  return addCardToMeld(meld, card, end);
 }
 
 /** Kart, perdeki jokerin temsil ettigi gercek karta denk geliyorsa islek sayilir. */
@@ -554,6 +542,10 @@ export function discardCard(state: GameState, seat: Seat, cardId: string): void 
   const hand = player.hand;
   const idx = hand.findIndex((c) => c.id === cardId);
   if (idx === -1) throw new ActionError('Bu kağıt elinde yok.');
+  if (player.hasOpened && hand.length === 1) {
+    finishHand(state, seat, { discardCardId: cardId, melds: [], pairs: [] });
+    return;
+  }
   if (player.receivedAskDiscard) {
     // Sorarak alma yukumlulugu yalnizca henuz acmamis oyuncu icin: acmadan atarsa ciftci.
     if (!player.hasOpened) {
@@ -581,6 +573,8 @@ export interface FinishReq {
   discardCardId?: string;
   /** Per/cift/atilacak kart otomatik bulunur (istemci veya bot). */
   auto?: boolean;
+  /** Bitiste once masadaki perlere islenecek kagitlar. */
+  processOps?: ProcessHandOp[];
 }
 
 // Bitir: kalan per/ciftleri bir anda indir + 15. karti at.
@@ -593,13 +587,25 @@ export function finishHand(state: GameState, seat: Seat, req: FinishReq): void {
   let meldReqs = req.melds ?? [];
   let pairGroups = req.pairs ?? [];
   let discardCardId = req.discardCardId ?? '';
+  let processOps = req.processOps ?? [];
 
-  if (req.auto || (meldReqs.length === 0 && pairGroups.length === 0 && !discardCardId)) {
+  if (
+    req.auto ||
+    (meldReqs.length === 0 &&
+      pairGroups.length === 0 &&
+      !discardCardId &&
+      processOps.length === 0)
+  ) {
     const plan = findFinishPlan(state, player.hand, player);
     if (!plan) throw new ActionError('Elin per veya çift olarak bitirilemedi.');
     meldReqs = plan.melds ?? [];
     pairGroups = plan.pairs ?? [];
     discardCardId = plan.discardCardId;
+    processOps = plan.processOps ?? [];
+  }
+
+  if (processOps.length > 0) {
+    processFromHandBatch(state, seat, processOps);
   }
 
   if (!discardCardId) throw new ActionError('Atılacak kağıt belirtilmedi.');
@@ -742,20 +748,22 @@ function requireCanProcess(state: GameState, seat: Seat): void {
 export interface ProcessHandOp {
   meldId: string;
   cardId: string;
+  end?: RunEnd;
 }
 
 function applyProcessFromHand(
   state: GameState,
   seat: Seat,
   meldId: string,
-  cardId: string
+  cardId: string,
+  end?: RunEnd
 ): void {
   const player = state.players[seat];
   const meld = state.melds.find((m) => m.id === meldId);
   if (!meld) throw new ActionError('Per bulunamadı.');
   const idx = player.hand.findIndex((c) => c.id === cardId);
   if (idx === -1) throw new ActionError('Bu kağıt elinde yok.');
-  const added = tryAddToMeld(meld, player.hand[idx]);
+  const added = tryAddToMeld(meld, player.hand[idx], end);
   if (!added) throw new ActionError('Bu kağıt bu pere işlenemez.');
   player.hand.splice(idx, 1);
   meld.cards = added.cards;
@@ -783,11 +791,24 @@ export function processFromHandBatch(
   if (player.hand.length - ops.length < 1)
     throw new ActionError('Atmak için en az bir kağıt kalmalı.');
   const used = new Set<string>();
+  const inputs = [];
   for (const op of ops) {
     if (used.has(op.cardId))
       throw new ActionError('Bir kağıt aynı işlemde birden fazla kullanılamaz.');
     used.add(op.cardId);
-    applyProcessFromHand(state, seat, op.meldId, op.cardId);
+    const card = player.hand.find((c) => c.id === op.cardId);
+    if (!card) throw new ActionError('Bu kağıt elinde yok.');
+    inputs.push({
+      meldId: op.meldId,
+      cardId: op.cardId,
+      card,
+      end: op.end,
+    });
+  }
+  const sequence = findProcessSequence(state.melds, inputs);
+  if (!sequence) throw new ActionError('Bu kağıtlar seçilen perlere işlenemez.');
+  for (const step of sequence) {
+    applyProcessFromHand(state, seat, step.meldId, step.cardId, step.end ?? undefined);
   }
   player.hasProcessed = true;
 }

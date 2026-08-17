@@ -390,6 +390,8 @@ function botDiscard(state: GameState, seat: Seat): BotTurnResult {
 
   botTryProcessHand(state, seat);
 
+  if (tryFinish(state, seat)) return 'handEnded';
+
   const card = pickBotDiscard(
     state,
     player.hand,

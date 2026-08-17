@@ -17,12 +17,14 @@ export function CardView({
   selected,
   onClick,
   animateIn = false,
+  represents,
 }: {
   card: Card;
   small?: boolean;
   selected?: boolean;
   onClick?: () => void;
   animateIn?: boolean;
+  represents?: { suit: Suit; rank: string } | null;
 }) {
   const cls = [
     'card',
@@ -38,6 +40,20 @@ export function CardView({
   if (card.isJoker) {
     const jokerName = card.back === 'red' ? 'Kırmızı joker' : 'Mavi joker';
     const jokerShort = card.back === 'red' ? 'K-JOKER' : 'M-JOKER';
+    if (represents?.suit && represents.rank) {
+      const red = isRed(represents.suit);
+      return (
+        <div
+          className={`${cls} joker joker-${card.back} joker-as ${red ? 'suit-red' : 'suit-black'}`}
+          onClick={onClick}
+          title={`${jokerName} = ${represents.rank} ${SUIT_SYMBOL[represents.suit]}`}
+        >
+          <span className="joker-star">&#9733;</span>
+          <span className="card-rank">{represents.rank}</span>
+          <span className="card-suit">{SUIT_SYMBOL[represents.suit]}</span>
+        </div>
+      );
+    }
     return (
       <div className={`${cls} joker joker-${card.back}`} onClick={onClick} title={jokerName}>
         <span className="joker-star">&#9733;</span>

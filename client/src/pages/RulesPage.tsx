@@ -97,7 +97,8 @@ export function RulesPage() {
         <p>
           Bir perde her kart benzersiz olmalıdır: aynı kâğıdın kırmızı ve mavi kopyası aynı pere
           giremez. Per en fazla beş karttır. Joker wild olarak durabilir ve temsil ettiği kartın
-          puanını taşır.
+          puanını taşır. Sıralı perde joker alta veya üste işlenebilir; ucu sen seçersin (örneğin
+          J–Q–K altına 10 olarak, sonra 9). Masada duran joker o sırayı korur.
         </p>
 
         <h2>5. Sıra: çek, aç veya işle, at</h2>
@@ -146,7 +147,9 @@ export function RulesPage() {
         <h3>İşleme ve işlek</h3>
         <p>
           Açtıktan sonra, sıran sende iken kendi, ortak veya rakip perlerine kart ekleyebilirsin.
-          Çiftçi işleyemez. Per açıldıktan sonra, atılan kart masadaki herhangi bir pere
+          Çiftçi işleyemez. Aynı turda birden fazla kâğıdı işleyebilirsin; sıralı perde jokeri
+          sol (küçük) veya sağ (büyük) uca kendin yerleştirirsin. Açmışken kalan kâğıtları masadaki
+          perlere işleyip son kartı atarak bitirebilirsin. Per açıldıktan sonra, atılan kart masadaki herhangi bir pere
           işlenebiliyorsa bu <strong>işlek atıştır</strong> ve atan takıma +71 yazılır. Elden veya
           atıktan işlemek ceza doğurmaz.
         </p>
@@ -172,7 +175,8 @@ export function RulesPage() {
             kartı atmak.
           </li>
           <li>
-            <strong>Perden bitme:</strong> açtıktan sonra kalanı indirip bitmek.
+            <strong>Perden bitme:</strong> açtıktan sonra kalanı indirip veya masadaki perlere
+            işleyip 15. kartı atmak. Açmışken elde tek kart kaldıysa onu atmak yeter.
           </li>
           <li>
             <strong>Çiftten bitme:</strong> yedi çift.

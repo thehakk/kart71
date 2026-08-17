@@ -77,6 +77,7 @@ Açış/baraj hesabı, "kafa" bonusu ve kaybeden **açan** oyuncunun elde kalan 
   - Bir perde **her kart benzersiz** olmalı → aynı kartın iki kopyası (kırmızı 7♥ + mavi 7♥) **aynı perde kullanılamaz**.
   - Bir per **en fazla 5 kart** olabilir (erkek per doğal olarak en fazla 4 seri).
   - Perlerde **joker** (wild) kullanılabilir; yerine geçtiği kartı temsil eder ve o kartın puanını sayar.
+  - **Sıralı perde joker ucu seçilir:** joker hem alta (düşük sayı, örn. `JQK` altına `10`) hem üste (yüksek, örn. `A`) işlenebilir. Oyuncu ucu seçer. Yerleşen joker o sırayı korur; sonraki işleme (örn. alta `9`) bu temsile göre yapılır. Masadaki per `buildRunOrder` ile yeniden dizilmez (joker As'a kaydırılmaz).
 
 ---
 
@@ -151,6 +152,9 @@ deklarasyonu veya **çift açma** yoluyla):
 - **Yalnızca sıra sendeyken** işlenir.
 - İşleme için önce **kendin açmış** olmalısın. **Çiftçi işleyemez.**
 - **Aynı turda** birden fazla kağıdı (aynı pere veya farklı perlere) tek seferde işleyebilirsin.
+  - Aynı pere giden kağıtlar **geçerli sırada** uygulanır (örn. `JQK` üzerine önce joker=`10`, sonra `9`; seçim sırası 9-joker olsa bile).
+  - Sıralı perde joker için **sol (küçük) / sağ (büyük)** uç seçilir.
+- Açmış oyuncu, elde kalan kağıtları masadaki perlere işleyip son kartı atarak **bitirebilir**. «Bitir» bu işlemeyi plana dahil eder. Açmışken elde tek kart kalmışsa o kartı atmak doğrudan bitiştir.
 - **İşlek cezası:** Yerde **per açıldıktan sonra**, atılan kart masadaki herhangi bir pere
   işlenebiliyorsa (**işlek atış**), o kartı **atan oyuncunun takımına +71** yazılır (her işlek
   atış için). Elden veya atıktan **işleme** ceza doğurmaz; çifte gitmek de işlek atışı
@@ -192,12 +196,13 @@ perin türüne göre değişir:
 ### 8.1 El nasıl biter?
 Bir el şu durumlardan biriyle biter:
 - Bir oyuncunun **elden bitmesi** (masada **kimse açmamışken**, tüm perleri bir anda indirip 15. kartı atarak),
-- **Sonradan perden** bitme (açtıktan sonra kalan perleri indirip bitme),
+- **Sonradan perden** bitme (açtıktan sonra kalan perleri indirip **ve/veya masadaki perlere işleyip** bitme),
 - **Çiftten** bitme (7 çift),
 - **Çekme destesinin tükenmesi** (kimse bitmeden).
 
 **Bitiş için puan limiti yoktur** (51 ile bile bitilebilir); şartlar:
-tüm perleri **bir anda indirebilmek** ve **15. kartı atabilmek**.
+tüm perleri **bir anda indirebilmek** (veya açmışken kalanı masadaki perlere işlemek) ve **15. kartı atabilmek**.
+Açmış oyuncunun elinde tek kart kaldıysa o kartı atmak bitiştir.
 
 > Önemli: **Masada biri açmışsa "elden bitme" kavramı düşer**, normal bitişe döner
 > (elden ×2 çarpanı uygulanmaz).
@@ -397,11 +402,11 @@ ile bildirilir).
 | `meld:lay` | `{ melds }` | Açıldıktan sonra per indir |
 | `meld:openPairs` | `{ pairs }` | Çiftle aç |
 | `meld:layPairs` | `{ pairs }` | Açıldıktan sonra çift indir |
-| `meld:processHand` | `{ meldId, cardIds?, ops? }` | Elden işleme (tek/toplu) |
+| `meld:processHand` | `{ meldId, cardIds?, ops? }` | Elden işleme (tek/toplu; `ops.end` = `low`/`high`) |
 | `meld:processDiscard` | `{ meldId }` | Atık üstünü işle (işlek) |
 | `meld:swapJoker` | `{ meldId, cardId }` | Perde joker al |
 | `meld:swapJokerPair` | `{ ownerSeat, pairIndex, cardId }` | Çifte wild al |
-| `meld:finish` | `{ melds?, pairs?, discardCardId }` | Bitir |
+| `meld:finish` | `{ melds?, pairs?, discardCardId, processOps? }` | Bitir (masaya işleme dahil) |
 | `game:continue` | — | Sonraki el |
 | `room:playAgain` | — | Lobiye dön |
 

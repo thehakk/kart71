@@ -353,6 +353,7 @@ io.on('connection', (socket) => {
           ops.map((op) => ({
             meldId: op?.meldId ?? '',
             cardId: op?.cardId ?? '',
+            end: op?.end,
           }))
         );
         return;
@@ -408,6 +409,7 @@ io.on('connection', (socket) => {
         pairs: payload?.pairs,
         discardCardId: payload?.discardCardId,
         auto: payload?.auto,
+        processOps: payload?.processOps,
       })
     )
   );
