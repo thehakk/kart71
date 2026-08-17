@@ -58,6 +58,8 @@ export interface PendingDiscard {
 }
 
 export type MeldType = 'run' | 'group'; // sirali per | erkek per
+/** Sirali perin dusuk (sol) veya yuksek (sag) ucu. */
+export type RunEnd = 'low' | 'high';
 
 export interface Meld {
   id: string;
@@ -227,7 +229,7 @@ export interface ClientToServerEvents {
     meldId: string;
     cardId?: string;
     cardIds?: string[];
-    ops?: { meldId: string; cardId: string }[];
+    ops?: { meldId: string; cardId: string; end?: RunEnd }[];
   }) => void;
   // Islek (M5): atik ustunu pere isle (atan takima +71)
   'meld:processDiscard': (payload: { meldId: string }) => void;
@@ -241,6 +243,7 @@ export interface ClientToServerEvents {
     pairs?: string[][];
     discardCardId?: string;
     auto?: boolean;
+    processOps?: { meldId: string; cardId: string; end?: RunEnd }[];
   }) => void;
   // Sonraki ele gec (M6/M7)
   'game:continue': () => void;

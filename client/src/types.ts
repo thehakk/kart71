@@ -22,6 +22,7 @@ export interface Card {
 export type GamePhase = 'draw' | 'action' | 'discard' | 'await' | 'ended';
 
 export type MeldType = 'run' | 'group';
+export type RunEnd = 'low' | 'high';
 
 export interface PendingDiscard {
   askerSeat: Seat;
@@ -215,7 +216,7 @@ export interface ClientToServerEvents {
     meldId: string;
     cardId?: string;
     cardIds?: string[];
-    ops?: { meldId: string; cardId: string }[];
+    ops?: { meldId: string; cardId: string; end?: RunEnd }[];
   }) => void;
   'meld:processDiscard': (payload: { meldId: string }) => void;
   'meld:swapJoker': (payload: { meldId: string; cardId: string }) => void;
@@ -226,6 +227,7 @@ export interface ClientToServerEvents {
     pairs?: string[][];
     discardCardId?: string;
     auto?: boolean;
+    processOps?: { meldId: string; cardId: string; end?: RunEnd }[];
   }) => void;
   'game:continue': () => void;
   'room:playAgain': () => void;

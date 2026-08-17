@@ -1,4 +1,4 @@
-import type { Card, MeldType, Rank, Suit } from '../shared/types.js';
+import type { Card, MeldType, Rank, RunEnd, Suit } from '../shared/types.js';
 
 export interface MeldOk {
   ok: true;
@@ -129,6 +129,75 @@ export function buildRunOrder(cards: Card[]): Card[] | null {
     else ordered.push(jokerList[ji++]);
   }
   return ordered;
+}
+
+export function seqToRank(seq: number): Rank | null {
+  const found = (Object.entries(RANK_SEQ) as [Rank, number][]).find(([, v]) => v === seq);
+  return found ? found[0] : null;
+}
+
+export interface MeldAddResult {
+  cards: Card[];
+  points: number;
+  end: RunEnd | null;
+}
+
+/**
+ * Masadaki sirali perin kayitli sirasini koruyarak kagit ekle.
+ * Joker her iki uca da gidebilir; buildRunOrder cagrilmaz (ekstra jokeri As'a
+ * kaydirip ornegin 10(joker)-J-Q-K uzerine 9 eklemeyi bozmasin).
+ */
+export function addCardToMeldOptions(
+  meld: { type: MeldType; cards: Card[] },
+  card: Card
+): MeldAddResult[] {
+  if (meld.type === 'group') {
+    if (meld.cards.length >= 4) return [];
+    const combined = [...meld.cards, card];
+    const res = validateMeld('group', combined);
+    return res.ok ? [{ cards: combined, points: res.points, end: null }] : [];
+  }
+  const base = meld.cards;
+  if (base.length >= MAX_LEN) return [];
+  const out: MeldAddResult[] = [];
+  const low = [card, ...base];
+  const rl = validateMeld('run', low);
+  if (rl.ok) out.push({ cards: low, points: rl.points, end: 'low' });
+  const high = [...base, card];
+  const rh = validateMeld('run', high);
+  if (rh.ok) out.push({ cards: high, points: rh.points, end: 'high' });
+  return out;
+}
+
+export function addCardToMeld(
+  meld: { type: MeldType; cards: Card[] },
+  card: Card,
+  end?: RunEnd
+): MeldAddResult | null {
+  const opts = addCardToMeldOptions(meld, card);
+  if (end) {
+    const match = opts.find((o) => o.end === end);
+    if (match) return match;
+    if (opts.length === 1 && opts[0].end === null) return opts[0];
+    return null;
+  }
+  return opts[0] ?? null;
+}
+
+/** Sirali perin bir alt / bir ust ucuna eklenebilecek sira (yoksa null). */
+export function runEndTargetRanks(cards: Card[]): { low: Rank | null; high: Rank | null } {
+  if (cards.length === 0 || cards.length >= MAX_LEN) return { low: null, high: null };
+  const res = validateRun(cards);
+  if (!res.ok) return { low: null, high: null };
+  const anchorIdx = cards.findIndex((c) => !c.isJoker);
+  if (anchorIdx === -1) return { low: null, high: null };
+  const anchorSeq = RANK_SEQ[cards[anchorIdx].rank as Rank];
+  const lowSeq = anchorSeq - anchorIdx - 1;
+  const highSeq = anchorSeq + (cards.length - 1 - anchorIdx) + 1;
+  return {
+    low: lowSeq >= 2 ? seqToRank(lowSeq) : null,
+    high: highSeq <= 14 ? seqToRank(highSeq) : null,
+  };
 }
 
 /** Çiftte joker veya taban (fiziksel kart ya da ayni suit+rank kopyasi) wild sayilir. */

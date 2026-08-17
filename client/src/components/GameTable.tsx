@@ -9,9 +9,9 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import type { Card, GameView, Seat } from '../types';
+import type { Card, GameView, RunEnd, Seat } from '../types';
 import { socket } from '../socket';
-import { detectAndBuildMeld, type BuiltMeld } from '../meldBuild';
+import { detectAndBuildMeld, processEndsAmbiguous, type BuiltMeld } from '../meldBuild';
 import { planFinishForHand, type FinishPlan } from '../finishPlan';
 import { CardBack, CardView } from './CardView';
 import { MeldsArea } from './MeldsArea';
@@ -115,7 +115,9 @@ export function GameTable({ game }: { game: GameView }) {
   // Isleme modu (M5)
   const [processMode, setProcessMode] = useState<'off' | 'hand' | 'discard'>('off');
   const [processCardIds, setProcessCardIds] = useState<string[]>([]);
-  const [processStaged, setProcessStaged] = useState<{ meldId: string; cardId: string }[]>([]);
+  const [processStaged, setProcessStaged] = useState<
+    { meldId: string; cardId: string; end?: RunEnd }[]
+  >([]);
   const [jokerMode, setJokerMode] = useState(false);
   const [jokerCardId, setJokerCardId] = useState<string | null>(null);
 
@@ -474,12 +476,14 @@ export function GameTable({ game }: { game: GameView }) {
       isCiftci: meInfo.isCiftci,
       openType: meInfo.openType ?? 'none',
       hasOpened: meInfo.hasOpened,
+      tableMelds: game.melds,
     });
   }, [
     finishDiscardId,
     finishManualMode,
     game.yourHand,
     game.taban,
+    game.melds,
     meInfo.isCiftci,
     meInfo.openType,
     meInfo.hasOpened,
@@ -652,10 +656,20 @@ export function GameTable({ game }: { game: GameView }) {
     setJokerMode(false);
     setJokerCardId(null);
   };
-  const onMeldClick = (meldId: string) => {
+  const onMeldClick = (meldId: string, end?: RunEnd) => {
     if (processMode === 'hand') {
       if (processCardIds.length === 0) {
         setLocalMsg('Önce elinden işlenecek kağıdı seç.');
+        return;
+      }
+      const meld = game.melds.find((m) => m.id === meldId);
+      const selectedCards = processCardIds
+        .map((id) => game.yourHand.find((c) => c.id === id))
+        .filter((c): c is Card => Boolean(c));
+      if (meld && !end && processEndsAmbiguous(meld, selectedCards)) {
+        setLocalMsg(
+          'Joker her iki uca da gidebilir — perin soluna (küçük, örn. 10) veya sağına (büyük, örn. A) dokun.'
+        );
         return;
       }
       setProcessStaged((prev) => {
@@ -667,7 +681,7 @@ export function GameTable({ game }: { game: GameView }) {
         }
         return [
           ...prev,
-          ...fresh.map((cardId) => ({ meldId, cardId })),
+          ...fresh.map((cardId) => ({ meldId, cardId, end })),
         ];
       });
       setProcessCardIds([]);
@@ -788,6 +802,7 @@ export function GameTable({ game }: { game: GameView }) {
       melds: plan.melds,
       pairs: plan.pairs,
       discardCardId: finishDiscardId,
+      processOps: plan.processOps,
     });
   };
 
@@ -983,6 +998,7 @@ export function GameTable({ game }: { game: GameView }) {
         seats={game.seats}
         clickable={processMode !== 'off' || jokerMode}
         jokerOnly={jokerMode}
+        attachMode={processMode === 'hand'}
         onMeldClick={onMeldClick}
       />
 
@@ -1428,9 +1444,20 @@ export function GameTable({ game }: { game: GameView }) {
             {finishDiscardId && finishAutoPlan && !finishManualMode && (
               <div className="finish-plan-preview">
                 <span className="muted">
-                  Kalan el: {(finishAutoPlan.melds?.length ?? 0) > 0
-                    ? `${finishAutoPlan.melds!.length} per`
-                    : `${finishAutoPlan.pairs?.length ?? 0} çift`}
+                  Kalan el:{' '}
+                  {[
+                    (finishAutoPlan.processOps?.length ?? 0) > 0
+                      ? `${finishAutoPlan.processOps!.length} kağıt masadaki pere işlenecek`
+                      : null,
+                    (finishAutoPlan.melds?.length ?? 0) > 0
+                      ? `${finishAutoPlan.melds!.length} per`
+                      : null,
+                    (finishAutoPlan.pairs?.length ?? 0) > 0
+                      ? `${finishAutoPlan.pairs!.length} çift`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(', ') || 'son kart atılacak'}
                   {finishDiscardCard?.isJoker ? ' — joker atışı (×2)' : ''}
                 </span>
               </div>
@@ -1616,8 +1643,8 @@ export function GameTable({ game }: { game: GameView }) {
                 ? processStaged.length > 0
                   ? `${processStaged.length} işleme hazır — istersen daha ekle veya İşle ile onayla.`
                   : processCardIds.length > 0
-                    ? `${processCardIds.length} kağıt seçildi — işlenecek pere dokun.`
-                    : 'Elinden bir veya birden fazla kağıt seç, sonra pere dokun.'
+                    ? `${processCardIds.length} kağıt seçildi — işlenecek pere dokun; joker için sol/sağ ucu seç.`
+                    : 'Elinden bir veya birden fazla kağıt seç, sonra pere dokun. Joker için perin sol (küçük) veya sağ (büyük) ucunu seç.'
                 : 'Atığı hangi pere işleyeceğini seç (atana +71).'}
             </span>
             {processMode === 'hand' && processStaged.length > 0 && (

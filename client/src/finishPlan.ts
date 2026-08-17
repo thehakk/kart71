@@ -1,10 +1,11 @@
-import type { Card, MeldType, Rank } from './types';
+import type { Card, Meld, MeldType, Rank, RunEnd } from './types';
 import {
   buildRunOrder,
   validateMeld,
   validatePair,
   isPairWild,
   rankPoints,
+  findLayoffSequence,
 } from './meldBuild';
 
 function cardPoints(c: Card): number {
@@ -21,6 +22,7 @@ export interface FinishPlan {
   melds?: MeldReq[];
   pairs?: string[][];
   discardCardId: string;
+  processOps?: { meldId: string; cardId: string; end?: RunEnd }[];
 }
 
 const RANK_SEQ: Record<Rank, number> = {
@@ -330,6 +332,52 @@ function coverHand(
   return null;
 }
 
+function layoffOps(
+  tableMelds: Meld[],
+  cards: Card[]
+): NonNullable<FinishPlan['processOps']> | null {
+  const seq = findLayoffSequence(tableMelds, cards);
+  if (!seq) return null;
+  return seq.map((s) => ({
+    meldId: s.meldId,
+    cardId: s.cardId,
+    end: s.end ?? undefined,
+  }));
+}
+
+function coverHandWithLayoffs(
+  cards: Card[],
+  tableMelds: Meld[],
+  memo = new Map<string, { melds: MeldReq[]; processOps: NonNullable<FinishPlan['processOps']> } | null>()
+): { melds: MeldReq[]; processOps: NonNullable<FinishPlan['processOps']> } | null {
+  if (cards.length === 0) return { melds: [], processOps: [] };
+  const key = cards
+    .map((c) => c.id)
+    .sort()
+    .join(',');
+  if (memo.has(key)) return memo.get(key) ?? null;
+
+  const lay = layoffOps(tableMelds, cards);
+  if (lay) {
+    const result = { melds: [] as MeldReq[], processOps: lay };
+    memo.set(key, result);
+    return result;
+  }
+
+  for (const m of enumerateMelds(cards)) {
+    const rest = removeByIds(cards, m.cardIds);
+    const sub = coverHandWithLayoffs(rest, tableMelds, memo);
+    if (sub) {
+      const result = { melds: [m, ...sub.melds], processOps: sub.processOps };
+      memo.set(key, result);
+      return result;
+    }
+  }
+
+  memo.set(key, null);
+  return null;
+}
+
 export function findPairGroups(hand: Card[], taban: Card): string[][] {
   const used = new Set<string>();
   const pairs: string[][] = [];
@@ -410,7 +458,8 @@ export function planFinishWithDiscard(
   taban: Card,
   discardCardId: string,
   mode: 'per' | 'cift' | 'auto',
-  allowDiscardOnly: boolean
+  allowDiscardOnly: boolean,
+  tableMelds: Meld[] = []
 ): FinishPlan | null {
   if (!hand.some((c) => c.id === discardCardId)) return null;
   const rest = hand.filter((c) => c.id !== discardCardId);
@@ -439,6 +488,17 @@ export function planFinishWithDiscard(
     const meldCover = coverHand(rest, taban, 'melds');
     if (meldCover && meldCover.melds.length > 0) {
       return { melds: meldCover.melds, pairs: [], discardCardId };
+    }
+    if (allowDiscardOnly && tableMelds.length > 0) {
+      const mixed = coverHandWithLayoffs(rest, tableMelds);
+      if (mixed) {
+        return {
+          melds: mixed.melds,
+          pairs: [],
+          discardCardId,
+          processOps: mixed.processOps,
+        };
+      }
     }
   }
 
@@ -492,6 +552,7 @@ export function planFinishForHand(
     isCiftci: boolean;
     openType: 'none' | 'per' | 'cift';
     hasOpened: boolean;
+    tableMelds?: Meld[];
   }
 ): FinishPlan | null {
   const allowDiscardOnly = opts.hasOpened;
@@ -501,5 +562,14 @@ export function planFinishForHand(
       : opts.openType === 'per'
         ? 'per'
         : 'auto';
-  return planFinishWithDiscard(hand, taban, discardCardId, mode, allowDiscardOnly);
+  const tableMelds =
+    allowDiscardOnly && mode === 'per' ? opts.tableMelds ?? [] : [];
+  return planFinishWithDiscard(
+    hand,
+    taban,
+    discardCardId,
+    mode,
+    allowDiscardOnly,
+    tableMelds
+  );
 }

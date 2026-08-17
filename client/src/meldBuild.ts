@@ -1,4 +1,4 @@
-import type { Card, MeldType, Rank } from './types';
+import type { Card, MeldType, Rank, RunEnd, Suit } from './types';
 
 const RANK_SEQ: Record<Rank, number> = {
   '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
@@ -150,4 +150,198 @@ export function validateMeld(
   const built = buildMeld(type, cards);
   if ('error' in built) return { ok: false, error: built.error };
   return { ok: true, type: built.type, points: built.points };
+}
+
+const MIN_LEN = 3;
+const MAX_LEN = 5;
+
+function validateRunOrder(
+  cards: Card[]
+): { ok: true; points: number } | { ok: false } {
+  if (cards.length < MIN_LEN || cards.length > MAX_LEN) return { ok: false };
+  const anchorIdx = cards.findIndex((c) => !c.isJoker);
+  if (anchorIdx === -1) return { ok: false };
+  const suit = cards[anchorIdx].suit;
+  const anchorSeq = RANK_SEQ[cards[anchorIdx].rank as Rank];
+  let points = 0;
+  const seenSeq = new Set<number>();
+  for (let i = 0; i < cards.length; i++) {
+    const seq = anchorSeq + (i - anchorIdx);
+    if (seq < 2 || seq > 14) return { ok: false };
+    if (seenSeq.has(seq)) return { ok: false };
+    seenSeq.add(seq);
+    const c = cards[i];
+    if (!c.isJoker) {
+      if (c.suit !== suit) return { ok: false };
+      if (RANK_SEQ[c.rank as Rank] !== seq) return { ok: false };
+    }
+    points += seqPoints(seq);
+  }
+  return { ok: true, points };
+}
+
+export function seqToRank(seq: number): Rank | null {
+  const found = (Object.entries(RANK_SEQ) as [Rank, number][]).find(([, v]) => v === seq);
+  return found ? found[0] : null;
+}
+
+export interface MeldAddResult {
+  cards: Card[];
+  points: number;
+  end: RunEnd | null;
+}
+
+export function addCardToMeldOptions(
+  meld: { type: MeldType; cards: Card[] },
+  card: Card
+): MeldAddResult[] {
+  if (meld.type === 'group') {
+    if (meld.cards.length >= 4) return [];
+    const combined = [...meld.cards, card];
+    const res = validateMeld('group', combined);
+    return res.ok ? [{ cards: combined, points: res.points, end: null }] : [];
+  }
+  const base = meld.cards;
+  if (base.length >= MAX_LEN) return [];
+  const out: MeldAddResult[] = [];
+  const low = [card, ...base];
+  const rl = validateRunOrder(low);
+  if (rl.ok) out.push({ cards: low, points: rl.points, end: 'low' });
+  const high = [...base, card];
+  const rh = validateRunOrder(high);
+  if (rh.ok) out.push({ cards: high, points: rh.points, end: 'high' });
+  return out;
+}
+
+export function runEndTargetRanks(cards: Card[]): { low: Rank | null; high: Rank | null } {
+  if (cards.length === 0 || cards.length >= MAX_LEN) return { low: null, high: null };
+  const res = validateRunOrder(cards);
+  if (!res.ok) return { low: null, high: null };
+  const anchorIdx = cards.findIndex((c) => !c.isJoker);
+  if (anchorIdx === -1) return { low: null, high: null };
+  const anchorSeq = RANK_SEQ[cards[anchorIdx].rank as Rank];
+  const lowSeq = anchorSeq - anchorIdx - 1;
+  const highSeq = anchorSeq + (cards.length - 1 - anchorIdx) + 1;
+  return {
+    low: lowSeq >= 2 ? seqToRank(lowSeq) : null,
+    high: highSeq <= 14 ? seqToRank(highSeq) : null,
+  };
+}
+
+export function resolveJokerInRun(
+  cards: Card[],
+  jokerIdx: number
+): { suit: Suit; rank: Rank } | null {
+  const anchorIdx = cards.findIndex((c) => !c.isJoker);
+  if (anchorIdx === -1) return null;
+  const suit = cards[anchorIdx].suit as Suit;
+  const anchorSeq = RANK_SEQ[cards[anchorIdx].rank as Rank];
+  const seq = anchorSeq + (jokerIdx - anchorIdx);
+  if (seq < 2 || seq > 14) return null;
+  const rank = seqToRank(seq);
+  if (!rank) return null;
+  return { suit, rank };
+}
+
+function searchOneMeld(
+  meld: { type: MeldType; cards: Card[] },
+  items: { card: Card; cardId: string; end?: RunEnd }[]
+): { cardId: string; end: RunEnd | null }[] | null {
+  const n = items.length;
+  if (n === 0) return [];
+  const used = new Array<boolean>(n).fill(false);
+  const steps: { cardId: string; end: RunEnd | null }[] = [];
+
+  const dfs = (current: { type: MeldType; cards: Card[] }): boolean => {
+    if (steps.length === n) return true;
+    for (let i = 0; i < n; i++) {
+      if (used[i]) continue;
+      const item = items[i];
+      let opts = addCardToMeldOptions(current, item.card);
+      if (item.end) {
+        opts = opts.filter((o) => o.end === item.end || o.end === null);
+      }
+      for (const opt of opts) {
+        used[i] = true;
+        steps.push({ cardId: item.cardId, end: opt.end });
+        if (dfs({ type: current.type, cards: opt.cards })) return true;
+        steps.pop();
+        used[i] = false;
+      }
+    }
+    return false;
+  };
+
+  return dfs(meld) ? steps : null;
+}
+
+export function processEndsAmbiguous(
+  meld: { type: MeldType; cards: Card[] },
+  cards: Card[]
+): boolean {
+  if (meld.type !== 'run') return false;
+  if (!cards.some((c) => c.isJoker)) return false;
+  const items = cards.map((c) => ({ card: c, cardId: c.id }));
+  if (!searchOneMeld(meld, items)) return false;
+  const low = searchOneMeld(
+    meld,
+    items.map((it) => ({ ...it, end: 'low' as const }))
+  );
+  const high = searchOneMeld(
+    meld,
+    items.map((it) => ({ ...it, end: 'high' as const }))
+  );
+  return !!(low && high);
+}
+
+export function canProcessCardsOnMeld(
+  meld: { type: MeldType; cards: Card[] },
+  cards: Card[],
+  end?: RunEnd
+): boolean {
+  const items = cards.map((c) => ({
+    card: c,
+    cardId: c.id,
+    end,
+  }));
+  return searchOneMeld(meld, items) != null;
+}
+
+export function findLayoffSequence(
+  melds: { id: string; type: MeldType; cards: Card[] }[],
+  cards: Card[]
+): { meldId: string; cardId: string; end: RunEnd | null }[] | null {
+  if (cards.length === 0) return [];
+  if (melds.length === 0) return null;
+
+  const remaining = [...cards];
+  const table = melds.map((m) => ({ ...m, cards: [...m.cards] }));
+  const steps: { meldId: string; cardId: string; end: RunEnd | null }[] = [];
+
+  const dfs = (): boolean => {
+    if (remaining.length === 0) return true;
+    for (let ci = 0; ci < remaining.length; ci++) {
+      const card = remaining[ci];
+      for (let mi = 0; mi < table.length; mi++) {
+        const opts = addCardToMeldOptions(table[mi], card);
+        for (const opt of opts) {
+          const saved = table[mi].cards;
+          table[mi].cards = opt.cards;
+          remaining.splice(ci, 1);
+          steps.push({
+            meldId: table[mi].id,
+            cardId: card.id,
+            end: opt.end,
+          });
+          if (dfs()) return true;
+          steps.pop();
+          remaining.splice(ci, 0, card);
+          table[mi].cards = saved;
+        }
+      }
+    }
+    return false;
+  };
+
+  return dfs() ? steps : null;
 }
