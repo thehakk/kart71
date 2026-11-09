@@ -28,9 +28,12 @@ const RANK_SEQ: Record<Rank, number> = {
   J: 11, Q: 12, K: 13, A: 14,
 };
 
+function freshJokers(hand: Card[], used: Set<string>): Card[] {
+  return hand.filter((c) => c.isJoker && !used.has(c.id));
+}
+
 function findGroupMelds(hand: Card[], used: Set<string>): MeldReq[] {
   const melds: MeldReq[] = [];
-  const jokers = hand.filter((c) => c.isJoker && !used.has(c.id));
   const byRank = new Map<Rank, Card[]>();
 
   for (const c of hand) {
@@ -40,31 +43,50 @@ function findGroupMelds(hand: Card[], used: Set<string>): MeldReq[] {
     byRank.set(c.rank, list);
   }
 
-  for (const cards of byRank.values()) {
+  const suitsOf = (cards: Card[]): Card[] => {
     const bySuit = new Map<string, Card>();
     for (const c of cards) {
-      if (c.suit && !bySuit.has(c.suit)) bySuit.set(c.suit, c);
+      if (used.has(c.id) || !c.suit) continue;
+      if (!bySuit.has(c.suit)) bySuit.set(c.suit, c);
     }
-    const uniq = [...bySuit.values()].filter((c) => !used.has(c.id));
-    if (uniq.length >= 3) {
-      const pick = uniq.slice(0, Math.min(4, uniq.length));
-      if (validateMeld('group', pick).ok) {
+    return [...bySuit.values()];
+  };
+
+  for (const cards of byRank.values()) {
+    while (true) {
+      const uniq = suitsOf(cards);
+      if (uniq.length >= 3) {
+        const pick = uniq.slice(0, Math.min(4, uniq.length));
+        if (!validateMeld('group', pick).ok) break;
         melds.push({ type: 'group', cardIds: pick.map((c) => c.id) });
         pick.forEach((c) => used.add(c.id));
         continue;
       }
-    }
-    if (uniq.length === 2 && jokers.length > 0) {
-      const joker = jokers.find((j) => !used.has(j.id));
-      if (joker) {
+      const joker = freshJokers(hand, used)[0];
+      if (joker && uniq.length === 2) {
         const pick = [...uniq, joker];
         if (validateMeld('group', pick).ok) {
           melds.push({ type: 'group', cardIds: pick.map((c) => c.id) });
           pick.forEach((c) => used.add(c.id));
+          continue;
         }
       }
+      break;
     }
   }
+
+  for (const joker of freshJokers(hand, used)) {
+    const host = melds.find((m) => m.type === 'group' && m.cardIds.length === 3);
+    if (!host) break;
+    const cards = host.cardIds
+      .map((id) => hand.find((c) => c.id === id))
+      .filter((c): c is Card => !!c);
+    const trial = [...cards, joker];
+    if (!validateMeld('group', trial).ok) break;
+    host.cardIds.push(joker.id);
+    used.add(joker.id);
+  }
+
   return melds;
 }
 
@@ -195,11 +217,13 @@ function enumerateGroupMelds(cards: Card[], melds: MeldReq[], seen: Set<string>)
         pickFromSuits(suitSubset, 0);
       }
     }
-    for (let k = 1; k <= Math.min(4, suitKeys.length); k++) {
-      const jokerNeed = Math.min(jokers.length, 4 - k);
-      if (jokerNeed <= 0) continue;
-      for (const suitSubset of combinationsOf(suitKeys, k)) {
-        pickFromSuits(suitSubset, jokerNeed);
+    for (let k = 1; k <= Math.min(3, suitKeys.length); k++) {
+      const maxJ = Math.min(jokers.length, 4 - k);
+      for (let jokerNeed = 1; jokerNeed <= maxJ; jokerNeed++) {
+        if (k + jokerNeed < 3) continue;
+        for (const suitSubset of combinationsOf(suitKeys, k)) {
+          pickFromSuits(suitSubset, jokerNeed);
+        }
       }
     }
   }
@@ -502,4 +526,28 @@ export function planFinishForHand(
         ? 'per'
         : 'auto';
   return planFinishWithDiscard(hand, taban, discardCardId, mode, allowDiscardOnly);
+}
+
+/** Bitir: tum atilabilir kagitlari dener. Joker atisi elden bitiste onde gelir. */
+export function findAutoFinishPlan(
+  hand: Card[],
+  taban: Card,
+  opts: {
+    isCiftci: boolean;
+    openType: 'none' | 'per' | 'cift';
+    hasOpened: boolean;
+  },
+  preferJokerDiscard = false
+): FinishPlan | null {
+  const allowDiscardOnly = opts.hasOpened;
+  if (opts.isCiftci || opts.openType === 'cift') {
+    return findCiftFinishPlan(hand, taban, allowDiscardOnly, preferJokerDiscard);
+  }
+  if (opts.openType === 'per') {
+    return findPerFinishPlan(hand, taban, allowDiscardOnly, preferJokerDiscard);
+  }
+  return (
+    findPerFinishPlan(hand, taban, allowDiscardOnly, preferJokerDiscard) ??
+    findCiftFinishPlan(hand, taban, allowDiscardOnly, preferJokerDiscard)
+  );
 }

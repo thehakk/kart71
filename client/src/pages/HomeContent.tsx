@@ -83,6 +83,7 @@ export function HomeContent({
         <p>
           Sıra sende olduğunda desteden çeker veya son atılan kartı alırsın. Atığı almak bazen
           rakibe sormayı gerektirir; sormadan almak seni o elde <strong>çiftçi</strong> yapar.
+          Çifte gidenin attığı kağıt sorulmaz, doğrudan alınır ve alan çiftçi olur.
           Çiftçi olan oyuncu perle değil çiftle açmak zorundadır ve atık yığınındaki kartları
           görebilir.
         </p>

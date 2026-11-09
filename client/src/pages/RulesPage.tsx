@@ -97,7 +97,8 @@ export function RulesPage() {
         <p>
           Bir perde her kart benzersiz olmalıdır: aynı kâğıdın kırmızı ve mavi kopyası aynı pere
           giremez. Per en fazla beş karttır. Joker wild olarak durabilir ve temsil ettiği kartın
-          puanını taşır.
+          puanını taşır. Eldeki tek joker, çok sayıda erkek perin içinde bir perde tamamlayabilir;
+          bu elde joker atılmadan da elden bitilir.
         </p>
 
         <h2>5. Sıra: çek, aç veya işle, at</h2>
@@ -107,7 +108,8 @@ export function RulesPage() {
         </p>
         <p>
           Atılan kart, atan oyuncuya sorulmadan alınamaz. Sormadan alan <strong>çiftçi</strong>{' '}
-          olur. İstenen kartı atan vermezse atan da çiftçi olur. Çiftçi, atığa tıkladığında
+          olur. İstenen kartı atan vermezse atan da çiftçi olur. Çifte giden oyuncunun attığı
+          kağıt sorulmaz: doğrudan alınır ve alan çiftçi olur. Çiftçi, atığa tıkladığında
           sormadan alır; ama yalnızca elindeki bir çifti tamamlayan atığı alabilir (joker ve taban
           bu «işe yarar atık» sayılmaz).
         </p>

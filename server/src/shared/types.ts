@@ -144,6 +144,8 @@ export interface GameView {
   drawCount: number;
   drawTopBack: Back | null; // destenin ust kartinin gercek sirti
   discardTop: Card | null;
+  /** Atigin ustunu ciftci attiysa sorulmaz; dogrudan alinir ve alan ciftci olur. */
+  discardFromCiftci?: boolean;
   discardCount: number;
   discardsMade: number; // 0 = henuz ilk atim yok (acilis karti alinabilir)
   discardAskable?: boolean; // islek/joker/taban haric sorarak alinabilir

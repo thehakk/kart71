@@ -12,7 +12,7 @@ import {
 import type { Card, GameView, Seat } from '../types';
 import { socket } from '../socket';
 import { detectAndBuildMeld, type BuiltMeld } from '../meldBuild';
-import { planFinishForHand, type FinishPlan } from '../finishPlan';
+import { findAutoFinishPlan, planFinishForHand, type FinishPlan } from '../finishPlan';
 import { CardBack, CardView } from './CardView';
 import { MeldsArea } from './MeldsArea';
 import { HandGrid, HAND_MIN_COLS, HAND_ROWS, findBottomRightEmptySlot, insertCardIntoGrid, resolveHandDropSlot, sortCardsByGridOrder } from './HandCards';
@@ -468,13 +468,16 @@ export function GameTable({ game }: { game: GameView }) {
     ? game.yourHand.find((c) => c.id === finishDiscardId) ?? null
     : null;
 
+  const finishOpts = {
+    isCiftci: meInfo.isCiftci,
+    openType: meInfo.openType ?? ('none' as const),
+    hasOpened: meInfo.hasOpened,
+  };
+  const preferJokerFinish = game.eldenFinishAllowed && !meInfo.hasOpened;
+
   const finishAutoPlan = useMemo((): FinishPlan | null => {
     if (!finishDiscardId || finishManualMode) return null;
-    return planFinishForHand(game.yourHand, game.taban, finishDiscardId, {
-      isCiftci: meInfo.isCiftci,
-      openType: meInfo.openType ?? 'none',
-      hasOpened: meInfo.hasOpened,
-    });
+    return planFinishForHand(game.yourHand, game.taban, finishDiscardId, finishOpts);
   }, [
     finishDiscardId,
     finishManualMode,
@@ -483,6 +486,25 @@ export function GameTable({ game }: { game: GameView }) {
     meInfo.isCiftci,
     meInfo.openType,
     meInfo.hasOpened,
+  ]);
+
+  const suggestedFinish = useMemo((): FinishPlan | null => {
+    if (!finishMode || finishManualMode) return null;
+    return findAutoFinishPlan(
+      game.yourHand,
+      game.taban,
+      finishOpts,
+      preferJokerFinish
+    );
+  }, [
+    finishMode,
+    finishManualMode,
+    game.yourHand,
+    game.taban,
+    meInfo.isCiftci,
+    meInfo.openType,
+    meInfo.hasOpened,
+    preferJokerFinish,
   ]);
 
   const finishPlanPreview = useMemo(() => {
@@ -608,7 +630,11 @@ export function GameTable({ game }: { game: GameView }) {
       return;
     }
     if (meInfo.openType === 'per') {
-      setLocalMsg('Per açtığın için çiftçi olamazsın; sorarak al veya desteden çek.');
+      setLocalMsg(
+        game.discardFromCiftci
+          ? 'Çiftçinin attığı sorulmaz. Per açtığın için desteden çek.'
+          : 'Per açtığın için çiftçi olamazsın; sorarak al veya desteden çek.'
+      );
       return;
     }
     takeDiscard(false);
@@ -713,7 +739,6 @@ export function GameTable({ game }: { game: GameView }) {
   const tryAutoFinish = () => {
     setLocalMsg(null);
     setFinishMode(true);
-    setFinishDiscardId(null);
     setFinishManualMode(false);
     setFinishStaged([]);
     setFinishStagedPairs([]);
@@ -722,6 +747,23 @@ export function GameTable({ game }: { game: GameView }) {
     setProcessMode('off');
     setJokerMode(false);
     setSelectedId(null);
+    const plan = findAutoFinishPlan(
+      game.yourHand,
+      game.taban,
+      {
+        isCiftci: meInfo.isCiftci,
+        openType: meInfo.openType ?? 'none',
+        hasOpened: meInfo.hasOpened,
+      },
+      game.eldenFinishAllowed && !meInfo.hasOpened
+    );
+    if (plan) {
+      setFinishDiscardId(plan.discardCardId);
+      setLocalMsg(null);
+    } else {
+      setFinishDiscardId(null);
+      setLocalMsg('Bu el per veya çift olarak kapanmıyor.');
+    }
   };
 
   const cancelFinishMode = () => {
@@ -884,7 +926,9 @@ export function GameTable({ game }: { game: GameView }) {
               title={
                 meInfo.isCiftci
                   ? 'Atığı al (çiftçi — sormadan)'
-                  : 'Atığı iste (atan oyuncuya sor)'
+                  : game.discardFromCiftci
+                    ? 'Çiftçiden al (çifte git)'
+                    : 'Atığı iste (atan oyuncuya sor)'
               }
             >
               {game.discardTop ? (
@@ -1041,7 +1085,13 @@ export function GameTable({ game }: { game: GameView }) {
               className={`pile-btn ${canDraw && discardTakeable ? 'active' : ''}`}
               onClick={takeTopDiscard}
               disabled={!canDraw || !discardTakeable}
-              title={meInfo.isCiftci ? 'Atığı al' : 'Atığı al / sor'}
+              title={
+                meInfo.isCiftci
+                  ? 'Atığı al'
+                  : game.discardFromCiftci
+                    ? 'Çiftçiden al'
+                    : 'Atığı al / sor'
+              }
             >
               {game.discardTop ? (
                 <CardView card={game.discardTop} />
@@ -1073,6 +1123,10 @@ export function GameTable({ game }: { game: GameView }) {
               deckEmpty ? (
                 <span className="turn-note">
                   Deste bitti — son atık alınamaz; <strong>El sonu</strong> butonuna tıkla
+                </span>
+              ) : meInfo.openType === 'per' && game.discardFromCiftci ? (
+                <span className="turn-note">
+                  Çiftçinin attığı sorulmaz — per açtığın için desteden çek
                 </span>
               ) : meInfo.isCiftci && discardTakeable ? (
                 <span className="turn-note">
@@ -1153,7 +1207,7 @@ export function GameTable({ game }: { game: GameView }) {
         {/* Atigi alma secenekleri (ciftci degilse) */}
         {canDraw && discardTakeable && !meInfo.isCiftci && !isOpeningTake && meInfo.openType !== 'per' && (
           <div className="take-bar">
-            {!earlyPhase && (
+            {!earlyPhase && !game.discardFromCiftci && (
               <button
                 type="button"
                 className="chip on"
@@ -1164,7 +1218,7 @@ export function GameTable({ game }: { game: GameView }) {
               </button>
             )}
             <button type="button" className="chip warn" onClick={() => takeDiscard(false)}>
-              Sormadan al (çifte git)
+              {game.discardFromCiftci ? 'Çiftçiden al (çifte git)' : 'Sormadan al (çifte git)'}
             </button>
             {game.takeBlocked && (
               <span className="muted take-blocked-hint">
@@ -1174,7 +1228,12 @@ export function GameTable({ game }: { game: GameView }) {
             {deckEmpty && game.discardTop && (
               <span className="muted">Deste bitti — son atık sorulamaz ve alınamaz.</span>
             )}
-            {!deckEmpty && !earlyPhase && game.discardAskable === false && game.discardTop && (
+            {game.discardFromCiftci && (
+              <span className="muted">
+                Çifte gidenin kağıdı sorulmaz. Alırsan çiftçi olursun.
+              </span>
+            )}
+            {!deckEmpty && !earlyPhase && !game.discardFromCiftci && game.discardAskable === false && game.discardTop && (
               <span className="muted">
                 İşlek atık alınamaz — desteden çek
                 {canSwapJoker && hasTableWild
@@ -1434,6 +1493,20 @@ export function GameTable({ game }: { game: GameView }) {
                   {finishDiscardCard?.isJoker ? ' — joker atışı (×2)' : ''}
                 </span>
               </div>
+            )}
+            {finishDiscardId && !finishAutoPlan && !finishManualMode && suggestedFinish && suggestedFinish.discardCardId !== finishDiscardId && (
+              <button
+                className="chip on"
+                type="button"
+                onClick={() => {
+                  setFinishDiscardId(suggestedFinish.discardCardId);
+                  setLocalMsg(null);
+                }}
+              >
+                {game.yourHand.some((c) => c.isJoker) && !game.yourHand.find((c) => c.id === suggestedFinish.discardCardId)?.isJoker
+                  ? 'Joker erkek perde kalsın — bu kağıtla bitir'
+                  : 'Bu kağıtla bitmiyor — uygun kağıdı seç'}
+              </button>
             )}
             {finishDiscardId && !finishAutoPlan && !finishManualMode && (
               <button

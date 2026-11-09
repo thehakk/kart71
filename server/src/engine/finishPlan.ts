@@ -20,9 +20,12 @@ const RANK_SEQ: Record<Rank, number> = {
   J: 11, Q: 12, K: 13, A: 14,
 };
 
+function freshJokers(hand: Card[], used: Set<string>): Card[] {
+  return hand.filter((c) => c.isJoker && !used.has(c.id));
+}
+
 function findGroupMelds(hand: Card[], used: Set<string>): MeldReq[] {
   const melds: MeldReq[] = [];
-  const jokers = hand.filter((c) => c.isJoker && !used.has(c.id));
   const byRank = new Map<Rank, Card[]>();
 
   for (const c of hand) {
@@ -32,31 +35,52 @@ function findGroupMelds(hand: Card[], used: Set<string>): MeldReq[] {
     byRank.set(c.rank, list);
   }
 
-  for (const cards of byRank.values()) {
+  const suitsOf = (cards: Card[]): Card[] => {
     const bySuit = new Map<string, Card>();
     for (const c of cards) {
-      if (c.suit && !bySuit.has(c.suit)) bySuit.set(c.suit, c);
+      if (used.has(c.id) || !c.suit) continue;
+      if (!bySuit.has(c.suit)) bySuit.set(c.suit, c);
     }
-    const uniq = [...bySuit.values()].filter((c) => !used.has(c.id));
-    if (uniq.length >= 3) {
-      const pick = uniq.slice(0, Math.min(4, uniq.length));
-      if (validateMeld('group', pick).ok) {
+    return [...bySuit.values()];
+  };
+
+  for (const cards of byRank.values()) {
+    // Ayni sayidan ikinci erkek per (diger kopyalar) ve jokeri de kur.
+    while (true) {
+      const uniq = suitsOf(cards);
+      if (uniq.length >= 3) {
+        const pick = uniq.slice(0, Math.min(4, uniq.length));
+        if (!validateMeld('group', pick).ok) break;
         melds.push({ type: 'group', cardIds: pick.map((c) => c.id) });
         pick.forEach((c) => used.add(c.id));
         continue;
       }
-    }
-    if (uniq.length === 2 && jokers.length > 0) {
-      const joker = jokers.find((j) => !used.has(j.id));
-      if (joker) {
+      const joker = freshJokers(hand, used)[0];
+      if (joker && uniq.length === 2) {
         const pick = [...uniq, joker];
         if (validateMeld('group', pick).ok) {
           melds.push({ type: 'group', cardIds: pick.map((c) => c.id) });
           pick.forEach((c) => used.add(c.id));
+          continue;
         }
       }
+      break;
     }
   }
+
+  // Joker hicbir 2'liyi tamamlamadiysa 3 kartlik erkek peri 4'e tamamlar.
+  for (const joker of freshJokers(hand, used)) {
+    const host = melds.find((m) => m.type === 'group' && m.cardIds.length === 3);
+    if (!host) break;
+    const cards = host.cardIds
+      .map((id) => hand.find((c) => c.id === id))
+      .filter((c): c is Card => !!c);
+    const trial = [...cards, joker];
+    if (!validateMeld('group', trial).ok) break;
+    host.cardIds.push(joker.id);
+    used.add(joker.id);
+  }
+
   return melds;
 }
 
@@ -187,11 +211,14 @@ function enumerateGroupMelds(cards: Card[], melds: MeldReq[], seen: Set<string>)
         pickFromSuits(suitSubset, 0);
       }
     }
-    for (let k = 1; k <= Math.min(4, suitKeys.length); k++) {
-      const jokerNeed = Math.min(jokers.length, 4 - k);
-      if (jokerNeed <= 0) continue;
-      for (const suitSubset of combinationsOf(suitKeys, k)) {
-        pickFromSuits(suitSubset, jokerNeed);
+    // Her joker sayisini dene. Iki joker tek perde yigilmasin; iki ayri erkek per paylassin.
+    for (let k = 1; k <= Math.min(3, suitKeys.length); k++) {
+      const maxJ = Math.min(jokers.length, 4 - k);
+      for (let jokerNeed = 1; jokerNeed <= maxJ; jokerNeed++) {
+        if (k + jokerNeed < 3) continue;
+        for (const suitSubset of combinationsOf(suitKeys, k)) {
+          pickFromSuits(suitSubset, jokerNeed);
+        }
       }
     }
   }

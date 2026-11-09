@@ -127,6 +127,7 @@ export interface GameView {
   drawCount: number;
   drawTopBack: Back | null;
   discardTop: Card | null;
+  discardFromCiftci?: boolean;
   discardCount: number;
   discardsMade: number;
   discardAskable?: boolean;

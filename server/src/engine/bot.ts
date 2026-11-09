@@ -312,6 +312,10 @@ function botDraw(state: GameState, seat: Seat): BotTurnResult {
 
   if (canTakeTopDiscard(state, seat)) {
     const top = state.discardPile[state.discardPile.length - 1]!;
+    const fromCiftci =
+      state.lastDiscarderSeat != null &&
+      state.players[state.lastDiscarderSeat].isCiftci &&
+      state.discardsMade > 0;
     if (shouldTakeDiscard(state, player, top)) {
       const helpsPairs = discardHelpsPairs(player.hand, top, state.taban);
       const withTop = [...player.hand, top];
@@ -324,13 +328,21 @@ function botDraw(state: GameState, seat: Seat): BotTurnResult {
         takeDiscard(state, seat, false);
         return 'continue';
       }
-      const ask =
-        !player.isCiftci &&
-        !player.hasOpened &&
-        !helpsPairs &&
-        (canPerOpen(withTop, state) || !!findFinishPlan(state, withTop, player));
-      takeDiscard(state, seat, ask);
-      return 'continue';
+      // Ciftcinin attigi sorulmaz. Yalnizca cift yoluna yarayan atik alinir.
+      if (fromCiftci) {
+        if (helpsPairs || player.isCiftci) {
+          takeDiscard(state, seat, false);
+          return 'continue';
+        }
+      } else {
+        const ask =
+          !player.isCiftci &&
+          !player.hasOpened &&
+          !helpsPairs &&
+          (canPerOpen(withTop, state) || !!findFinishPlan(state, withTop, player));
+        takeDiscard(state, seat, ask);
+        return 'continue';
+      }
     }
   }
 

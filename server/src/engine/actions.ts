@@ -82,6 +82,12 @@ function isBlockedDiscardForCiftci(state: GameState, c: Card): boolean {
   return c.isJoker || isTabanLikeCard(c, state.taban);
 }
 
+function topDiscarderIsCiftci(state: GameState): boolean {
+  const seat = state.lastDiscarderSeat;
+  if (seat == null || state.discardsMade === 0) return false;
+  return state.players[seat].isCiftci;
+}
+
 function ciftciCanTakeDiscard(
   state: GameState,
   player: GameState['players'][number],
@@ -109,6 +115,8 @@ export function canTakeTopDiscard(state: GameState, seat: Seat): boolean {
   if (isWildCard(state, top)) return false;
   if (isIslekDiscard(state, top)) return false;
   if (player.isCiftci) return ciftciCanTakeDiscard(state, player, top);
+  // Ciftcinin attigi sorulmaz. Per acan ciftci olamayacagi icin bu atigi alamaz.
+  if (topDiscarderIsCiftci(state) && player.openType === 'per') return false;
   return true;
 }
 
@@ -125,6 +133,7 @@ export function takeDiscard(state: GameState, seat: Seat, ask: boolean): void {
   requireTurn(state, seat);
   if (state.pending) throw new ActionError('Bekleyen bir istek var.');
   if (state.phase !== 'draw') throw new ActionError('Şu an çekme/alma sırası değil.');
+  if (topDiscarderIsCiftci(state)) ask = false;
   if (state.takeBlocked && ask)
     throw new ActionError('Bu atığı sorarak alamazsın; sormadan al (çiftçi ol) veya desteden çek.');
   const top = state.discardPile[state.discardPile.length - 1];
@@ -166,6 +175,16 @@ export function takeDiscard(state: GameState, seat: Seat, ask: boolean): void {
     return;
   }
 
+  // Cifte gidenin attigi sorulmaz: dogrudan alinir, alan ciftci olur.
+  if (topDiscarderIsCiftci(state)) {
+    if (player.openType === 'per') {
+      throw new ActionError(
+        'Çiftçinin attığı kağıt sorulmaz. Per açtığın için alamazsın; desteden çek.'
+      );
+    }
+    ask = false;
+  }
+
   // ask parametresi ciftci icin yok sayilir; yukarida ele alindi.
   if (ask) {
     if (isEarlyDiscardPhase(state.discardsMade))
@@ -198,6 +217,7 @@ export function canAskForDiscard(state: GameState, seat: Seat): boolean {
   if (!top) return false;
   const player = state.players[seat];
   if (player.isCiftci) return false;
+  if (topDiscarderIsCiftci(state)) return false;
   if (state.discardsMade === 0) return false;
   if (deckEmptyBlocksDiscardTake(state)) return false;
   if (isWildCard(state, top)) return false;

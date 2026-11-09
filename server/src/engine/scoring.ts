@@ -129,7 +129,10 @@ export function kafaBonus(openValue: number, pairCount: number): number {
 function finishMultiplier(info: FinishInfo): number {
   let m = 1;
   if (info.eldenFinish) m *= 2;
-  // ciftten bitis carpani oyuncu bazinda (200×2 / elde×4); tabana tekrar uygulanmaz.
+  // Elden cift bitiste oyuncu tabani 100/200 kalir; cift ×2 burada uygulanir.
+  // Kimse acmamisken 7 cift: 200 × 2 × 2 + kafa 200 = 1000. Joker atisi ek ×2 = 1800.
+  // Elden olmayan cift bitiste carpan oyuncu bazindadir (acmamis ciftci 400, acmis elde ×4).
+  if (info.ciftFinish && info.eldenFinish) m *= 2;
   if (info.jokerDiscard) m *= 2;
   return m;
 }

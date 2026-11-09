@@ -237,6 +237,10 @@ export function toGameView(state: GameState, forSeat: Seat): GameView {
     drawCount: state.drawPile.length,
     drawTopBack: state.drawPile[0]?.back ?? null,
     discardTop,
+    discardFromCiftci:
+      state.discardsMade > 0 &&
+      state.lastDiscarderSeat != null &&
+      state.players[state.lastDiscarderSeat].isCiftci,
     discardCount: state.discardPile.length,
     discardsMade: state.discardsMade,
     visibleDiscards: canSeeAllDiscards(state, forSeat)
